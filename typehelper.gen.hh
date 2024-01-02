@@ -81,6 +81,21 @@ void ptr_addr_remove(void* k, void* v) {
         ptr_addr.erase(it);
 }
 
+// spin-lock
+#include <stdatomic.h>
+#include <pthread.h>
+
+atomic_flag lock = ATOMIC_FLAG_INIT;
+
+void lock_acquire() {
+    while (atomic_flag_test_and_set(&lock));
+        // pthread_yield();
+}
+
+void lock_release() {
+    atomic_flag_clear(&lock);
+}
+
 // list
 
 struct list {

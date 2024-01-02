@@ -4,20 +4,23 @@
 
 using std::cout, std::endl, std::set;
 
-static VOID* l_address = (VOID*)0x555555558158;
-static VOID* l2_address = (VOID*)0x555555558160;
+// static VOID* l_address = (VOID*)0x555555558158;
+// static VOID* l2_address = (VOID*)0x555555558160;
 
 VOID RecordRead(VOID *addr) {
+    lock_acquire();
     var to_search;
     to_search.address = addr;
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_read((*it));
     }
+    lock_release();
 }
 
 // When the address of global variable is overwrited, this function is called to calculate the new address for all its fields
 VOID BeforeWrite(VOID *addr) {
+    lock_acquire();
     var to_search;
     to_search.address = addr;
     auto it = var_set.find(&to_search);
@@ -27,10 +30,12 @@ VOID BeforeWrite(VOID *addr) {
             (*it)->set_before_write(*it);
         }
     }
+    lock_release();
 }
 
 // When the address of global variable is overwrited, this function is called to calculate the new address for all its fields
 VOID AfterWrite(VOID *addr) {
+    lock_acquire();
     var to_search;
     to_search.address = addr;
     auto it = var_set.find(&to_search);
@@ -40,9 +45,11 @@ VOID AfterWrite(VOID *addr) {
             (*it)->set_after_write(*it);
         }
     }
+    lock_release();
 }
 
 VOID BeforeFree(VOID* addr) {
+    lock_acquire();
     cout << "[CALL] [free(" << addr << ")]" << endl;
     if (ptr_addr.find(addr) != ptr_addr.end()) {
         set<void*> value = ptr_addr[addr];
@@ -81,6 +88,7 @@ VOID BeforeFree(VOID* addr) {
     //         free(*it);
     //     }
     // }
+    lock_release();
 }
 
 VOID Image(IMG img, VOID* v) {
@@ -129,12 +137,14 @@ VOID InsertInstruction(INS ins, VOID *v) {
 }
 
 int main(int argc, char *argv[]) {
-    // Initialize var set
-    var* list_var_l = list_var_construct((void*)l_address, TYPE_POINTER, "l");
-    var_set.insert(list_var_l);
+    // // Initialize var set
+    // var* list_var_l = list_var_construct((void*)l_address, TYPE_POINTER, "l");
+    // var_set.insert(list_var_l);
 
-    var* list_var_l2 = list_var_construct((void*)l2_address, TYPE_POINTER, "l2");
-    var_set.insert(list_var_l2);
+    // var* list_var_l2 = list_var_construct((void*)l2_address, TYPE_POINTER, "l2");
+    // var_set.insert(list_var_l2);
+    var* int_var = int_var_construct((void*)0x5555555581b0, TYPE_VAR, "global_int");
+    var_set.insert(int_var);
 
     // Initialize pin
     PIN_InitSymbols();
