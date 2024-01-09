@@ -50,7 +50,8 @@ VOID AfterWrite(VOID *addr) {
 
 VOID BeforeFree(VOID* addr) {
     lock_acquire();
-    cout << "[CALL] [free(" << addr << ")]" << endl;
+    if (addr != NULL)
+        cout << "[CALL] [free(" << addr << ")]" << endl;
     if (ptr_addr.find(addr) != ptr_addr.end()) {
         set<void*> value = ptr_addr[addr];
         ptr_addr.erase(addr);
