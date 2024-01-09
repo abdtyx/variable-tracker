@@ -46,7 +46,7 @@ void print_var(var* v, string space = "") {
 bool valid_ptr(void* addr) {
     // cout << "[validate]: " << addr << endl;
     uint64_t value = (uint64_t)addr;
-    value >>= 32;
+    value >>= 40;
     // cout << "[value]: " << value << endl;
     return (value == 0x55 || value == 0x7f);
 }
