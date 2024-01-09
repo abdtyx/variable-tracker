@@ -83,13 +83,13 @@ void ptr_addr_remove(void* k, void* v) {
 
 // spin-lock
 #include <stdatomic.h>
-#include <pthread.h>
+#include <sched.h>
 
 atomic_flag lock = ATOMIC_FLAG_INIT;
 
 void lock_acquire() {
-    while (atomic_flag_test_and_set(&lock));
-        // pthread_yield();
+    while (atomic_flag_test_and_set(&lock))
+        sched_yield();
 }
 
 void lock_release() {
