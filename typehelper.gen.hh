@@ -48,7 +48,7 @@ bool valid_ptr(void* addr) {
     uint64_t value = (uint64_t)addr;
     value >>= 32;
     // cout << "[value]: " << value << endl;
-    return (value == 0x5555 || value == 0x7fff);
+    return (value == 0x55 || value == 0x7f);
 }
 
 bool invalid_ptr(void* addr) {
