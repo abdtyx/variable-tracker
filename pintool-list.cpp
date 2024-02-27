@@ -92,6 +92,42 @@ VOID BeforeFree(VOID* addr) {
     lock_release();
 }
 
+VOID BeforeLeave(ADDRINT rbp, ADDRINT rsp) {
+    lock_acquire();
+    // cout << var_set.size() << endl;
+    uint64_t start = rsp, end = rbp + 0x10;
+    vector<var*> dirty;
+    for (auto i : var_set) {
+        if ((uint64_t)i->address >= start && (uint64_t)i->address < end) {
+            dirty.push_back(i);
+            if (i->type == TYPE_POINTER) {
+                // void* key;
+                // PIN_SafeCopy(&key, i->address, sizeof(key));
+                // // call remove
+                // ptr_addr_remove(key, i->address);
+                // call set_before_write
+                i->set_before_write(i);
+            } else if (i->type == TYPE_VAR) {
+                // call erase
+                ptr_addr.erase(i->address);
+            }
+            
+        }
+    }
+    for (auto i : dirty) {
+        var_set.erase(i);
+        free(i);
+    }
+    // ADDRINT rbp = PIN_GetContextReg(c, REG_GBP);
+    // ADDRINT rsp = PIN_GetContextReg(c, REG_STACK_PTR);
+    // printf("rbp value: %lx\n", rbp);
+    // printf("rsp value: %lx\n", rsp);
+    // cout << "rbp value: " << rbp << endl;
+    // cout << "rsp value: " << rsp << endl;
+    // cout << var_set.size() << endl;
+    lock_release();
+}
+
 VOID Image(IMG img, VOID* v) {
     // Find the free() function.
     RTN freeRtn = RTN_FindByName(img, "free");
@@ -135,6 +171,15 @@ VOID InsertInstruction(INS ins, VOID *v) {
             );
         }
     }
+    // cout << INS_Disassemble(ins) << endl;
+    if (INS_Disassemble(ins) == "leave ") {
+        INS_InsertPredicatedCall(
+            ins, IPOINT_BEFORE, (AFUNPTR)BeforeLeave,
+            IARG_REG_VALUE, REG_GBP,
+            IARG_REG_VALUE, REG_STACK_PTR,
+            IARG_END
+        );
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -144,8 +189,10 @@ int main(int argc, char *argv[]) {
 
     // var* list_var_l2 = list_var_construct((void*)l2_address, TYPE_POINTER, "l2");
     // var_set.insert(list_var_l2);
-    var* int_var = int_var_construct((void*)0x5555555581b0, TYPE_VAR, "global_int");
+    var* int_var = int_var_construct((void*)0x555555558158, TYPE_POINTER, "globall");
     var_set.insert(int_var);
+    var* list_var = list_var_construct((void*)0x555555558160, TYPE_POINTER, "l");
+    var_set.insert(list_var);
 
     // Initialize pin
     PIN_InitSymbols();
