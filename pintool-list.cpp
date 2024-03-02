@@ -4,8 +4,8 @@
 
 using std::cout, std::endl, std::set;
 
-// static VOID* l_address = (VOID*)0x555555558158;
-// static VOID* l2_address = (VOID*)0x555555558160;
+static VOID* l_address = (VOID*)0x555555558158;
+static VOID* l2_address = (VOID*)0x555555558160;
 
 VOID RecordRead(VOID *addr) {
     lock_acquire();
@@ -43,6 +43,7 @@ VOID AfterWrite(VOID *addr) {
         (*it)->log_after_write((*it));
         if ((*it)->type == TYPE_POINTER) {
             (*it)->set_after_write(*it);
+            // print_var(*it);
         }
     }
     lock_release();
@@ -52,30 +53,28 @@ VOID BeforeFree(VOID* addr) {
     lock_acquire();
     if (addr != NULL)
         cout << "[CALL] [free(" << addr << ")]" << endl;
-    if (ptr_addr.find(addr) != ptr_addr.end()) {
-        set<void*> value = ptr_addr[addr];
-        ptr_addr.erase(addr);
-        for (auto i = value.begin(); i != value.end(); i++) {
-            var to_search;
-            to_search.address = *i;
-            auto it = var_set.find(&to_search);
-            if (i == value.begin()) {
-                if (it != var_set.end()) {
-                    if ((*it)->type == TYPE_POINTER) {
-                        (*it)->set_before_write(*it);
-                    }
-                }
-            } else {
-                if (it != var_set.end()) {
-                    if ((*it)->type == TYPE_POINTER) {
-                        // void* value;
-                        // PIN_SafeCopy(&value, (*it)->address, sizeof(value));
-                        // ptr_addr_remove(value, (*it)->address);
-                        (*it)->children.clear();
-                    }
-                }
-            }
-        }
+    var to_search;
+    to_search.address = addr;
+    auto it = var_set.find(&to_search);
+    if (it != var_set.end()) {
+        // auto clear = (*it)->father.begin();
+        // if (clear != (*it)->father.end()) {
+        //     // The father must be a TYPE_POINTER
+        //     (*clear)->set_before_write(*clear);
+        // }
+        // find all children
+        set<var*> children;
+        for (auto i : (*it)->father)
+            for (auto j : i->children)
+                children.insert(j);
+        // find all fathers
+        set<var*> fathers;
+        for (auto i : children)
+            for (auto j : i->father)
+                fathers.insert(j);
+        // call set_before_write on all fathers
+        for (auto i : fathers)
+            i->set_before_write(i);
     }
     // var to_search;
     // to_search.address = addr;
@@ -100,6 +99,7 @@ VOID BeforeLeave(ADDRINT rbp, ADDRINT rsp) {
     for (auto i : var_set) {
         if ((uint64_t)i->address >= start && (uint64_t)i->address < end) {
             dirty.push_back(i);
+            /*
             if (i->type == TYPE_POINTER) {
                 // void* key;
                 // PIN_SafeCopy(&key, i->address, sizeof(key));
@@ -111,12 +111,21 @@ VOID BeforeLeave(ADDRINT rbp, ADDRINT rsp) {
                 // call erase
                 ptr_addr.erase(i->address);
             }
-            
+            */            
         }
     }
+    // find all fathers
+    set<var*> fathers;
+    for (auto i : dirty)
+        for (auto j : i->father)
+            fathers.insert(j);
+    // call set_before_write on all fathers
+    for (auto i : fathers)
+        i->set_before_write(i);
+    // clean the rest of the dirty memory
     for (auto i : dirty) {
-        var_set.erase(i);
-        free(i);
+        if (var_set.erase(i))
+            free(i);
     }
     // ADDRINT rbp = PIN_GetContextReg(c, REG_GBP);
     // ADDRINT rsp = PIN_GetContextReg(c, REG_STACK_PTR);
@@ -183,16 +192,22 @@ VOID InsertInstruction(INS ins, VOID *v) {
 }
 
 int main(int argc, char *argv[]) {
-    // // Initialize var set
-    // var* list_var_l = list_var_construct((void*)l_address, TYPE_POINTER, "l");
-    // var_set.insert(list_var_l);
+    // Initialize var set
+    cout << "Initializing critical variable set\n";
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
+    var* root = new var;
+    root->address = NULL;
+    var* list_var_l = list_var_construct((void*)l_address, TYPE_POINTER, root, "l");
+    var_set.insert(list_var_l);
 
-    // var* list_var_l2 = list_var_construct((void*)l2_address, TYPE_POINTER, "l2");
-    // var_set.insert(list_var_l2);
-    var* int_var = int_var_construct((void*)0x555555558158, TYPE_POINTER, "globall");
-    var_set.insert(int_var);
-    var* list_var = list_var_construct((void*)0x555555558160, TYPE_POINTER, "l");
-    var_set.insert(list_var);
+    var* list_var_l2 = list_var_construct((void*)l2_address, TYPE_POINTER, root, "l2");
+    var_set.insert(list_var_l2);
+    // var* int_var = int_var_construct((void*)0x555555558158, TYPE_POINTER, "globall");
+    // var_set.insert(int_var);
+    // var* list_var = list_var_construct((void*)0x555555558160, TYPE_POINTER, "l");
+    // var_set.insert(list_var);
+
+    cout << "Critical variable set initialized\n";
 
     // Initialize pin
     PIN_InitSymbols();
