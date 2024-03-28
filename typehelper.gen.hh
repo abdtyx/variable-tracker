@@ -80,10 +80,16 @@ void lock_release() {
 
 // list
 
-struct list {
+// struct list {
+//     int a;
+//     double* b;
+//     struct list* next;
+// };
+class list {
+public:
     int a;
     double* b;
-    struct list* next;
+    list* next;
 };
 
 var* list_var_construct(void* addr, uint64_t type, var* father, string name = DEFAULT_NAME);
@@ -98,12 +104,6 @@ void double_log_before_write(var* v);
 void double_log_after_write(var* v);
 void double_set_before_write(var* v);
 void double_set_after_write(var* v);
-var* int_var_construct(void* addr, uint64_t type, var* father, string name = DEFAULT_NAME);
-void int_log_read(var* v);
-void int_log_before_write(var* v);
-void int_log_after_write(var* v);
-void int_set_before_write(var* v);
-void int_set_after_write(var* v);
 
 void set_before_write(var* v);
 
@@ -115,10 +115,36 @@ void set_before_write(var* v) {
             // cout << var_set.size() << endl;
             var_set.erase(child);
             // cout << var_set.size() << endl;
-            free(child);
+            delete child;
         }
     }
     v->children.clear();
+}
+
+template <typename T>
+struct log {
+    static void log_read(var* v);
+    static void log_before_write(var* v);
+    static void log_after_write(var* v);
+    static void set_after_write(var* v);
+};
+
+template <typename T>
+var* var_construct(void* addr, uint64_t type, var* father, string name = DEFAULT_NAME) {
+    var* v = new var;
+    v->name = name;
+    v->address = (void*)addr;
+    v->invalid = false;
+    v->children.clear();
+    v->father.insert(father);
+    v->type = type;
+    log<T> l;
+    v->log_read = l.log_read;
+    v->log_before_write = l.log_before_write;
+    v->log_after_write = l.log_after_write;
+    v->set_before_write = set_before_write;
+    v->set_after_write = l.set_after_write;
+    return v;
 }
 
 var* list_var_construct(void* addr, uint64_t type, var* father, string name) {
@@ -185,19 +211,19 @@ void list_set_after_write(var* v) {
             }
         }
     } else {
-        free(list_var);
+        delete list_var;
         (*i)->father.insert(v);
         v->children.push_back(*i);
     }
 
     // int a
-    var* int_var = int_var_construct(&(value->a), TYPE_VAR, v, "a");
+    var* int_var = var_construct<int>(&(value->a), TYPE_VAR, v, "a");
     i = var_set.find(int_var);
     if (i == var_set.end()) {
         var_set.insert(int_var);
         v->children.push_back(int_var);
     } else {
-        free(int_var);
+        delete int_var;
         (*i)->father.insert(v);
         v->children.push_back(*i);
     }
@@ -219,7 +245,7 @@ void list_set_after_write(var* v) {
             }
         }
     } else {
-        free(double_var);
+        delete double_var;
         (*i)->father.insert(v);
         v->children.push_back(*i);
     }
@@ -300,88 +326,168 @@ void double_set_after_write(var* v) {
         var_set.insert(double_var);
         v->children.push_back(double_var);
     } else {
-        free(double_var);
+        delete double_var;
         (*i)->father.insert(v);
         v->children.push_back(*i);
     }
 }
 
-// int
-
-var* int_var_construct(void* addr, uint64_t type, var* father, string name) {
-    var* int_var = new var;
-    int_var->name = name;
-    int_var->address = (void*)addr;
-    int_var->invalid = false;
-    int_var->children.clear();
-    int_var->father.insert(father);
-    int_var->type = type;
-    int_var->log_read = int_log_read;
-    int_var->log_before_write = int_log_before_write;
-    int_var->log_after_write = int_log_after_write;
-    int_var->set_before_write = set_before_write;
-    int_var->set_after_write = int_set_after_write;
-    return int_var;
-}
-
-void int_log_read(var* v) {
-    if (v->type == TYPE_VAR) {
-        int value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[READ] int " << v->name << ' ' << value << endl;
+template <>
+struct log<int> {
+    static void log_read(var* v) {
+        if (v->type == TYPE_VAR) {
+            int value;
+            PIN_SafeCopy(&value, v->address, sizeof(value));
+            cout << "[READ] int " << v->name << ' ' << value << endl;
+        }
+        else if (v->type == TYPE_POINTER) {
+            int* value;
+            PIN_SafeCopy(&value, v->address, sizeof(value));
+            cout << "[READ] int* " << v->name << ' ' << value << endl;
+        }
     }
-    else if (v->type == TYPE_POINTER) {
+    static void log_before_write(var* v) {
+        if (v->type == TYPE_VAR) {
+            int value;
+            PIN_SafeCopy(&value, v->address, sizeof(value));
+            cout << "[BEFORE WRITE] int " << v->name << ' ' << value << endl;
+        }
+        else if (v->type == TYPE_POINTER) {
+            int* value;
+            PIN_SafeCopy(&value, v->address, sizeof(value));
+            cout << "[BEFORE WRITE] int* " << v->name << ' ' << value << endl;
+        }
+    }
+
+    static void log_after_write(var* v) {
+        if (v->type == TYPE_VAR) {
+            int value;
+            PIN_SafeCopy(&value, v->address, sizeof(value));
+            cout << "[AFTER WRITE] int " << v->name << ' ' << value << endl;
+        }
+        else if (v->type == TYPE_POINTER) {
+            int* value;
+            PIN_SafeCopy(&value, v->address, sizeof(value));
+            cout << "[AFTER WRITE] int* " << v->name << ' ' << value << endl;
+        }
+    }
+
+    static void set_after_write(var* v) {
         int* value;
         PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[READ] int* " << v->name << ' ' << value << endl;
-    }
-}
+        if (invalid_ptr(value))
+            return;
 
-void int_log_before_write(var* v) {
-    if (v->type == TYPE_VAR) {
-        int value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[BEFORE WRITE] int " << v->name << ' ' << value << endl;
-    }
-    else if (v->type == TYPE_POINTER) {
-        int* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[BEFORE WRITE] int* " << v->name << ' ' << value << endl;
-    }
-}
+        set<var*>::iterator i;
 
-void int_log_after_write(var* v) {
-    if (v->type == TYPE_VAR) {
-        int value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[AFTER WRITE] int " << v->name << ' ' << value << endl;
+        var* int_var = var_construct<int>(value, TYPE_VAR, v);
+        i = var_set.find(int_var);
+        if (i == var_set.end()) {
+            var_set.insert(int_var);
+            v->children.push_back(int_var);
+        } else {
+            delete int_var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
     }
-    else if (v->type == TYPE_POINTER) {
-        int* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[AFTER WRITE] int* " << v->name << ' ' << value << endl;
-    }
-}
+};
 
-void int_set_before_write(var* v) {
-}
+// template <typename T>
+// class template_list {
+// public:
+//     T a;
+//     double* b;
+//     template_list* next;
+// };
 
-void int_set_after_write(var* v) {
-    int* value;
-    PIN_SafeCopy(&value, v->address, sizeof(value));
-    if (invalid_ptr(value))
-        return;
+// template <typename U>
+// struct log<template_list<U>> {
+//     static void log_read(var* v) {
+//         template_list* value;
+//         PIN_SafeCopy(&value, v->address, sizeof(value));
+//         cout << "[READ] template_list<T>* " << v->name << ' ' << value << endl;
+//     }
 
-    set<var*>::iterator i;
+//     static void log_before_write(var* v) {
+//         template_list* value;
+//         PIN_SafeCopy(&value, v->address, sizeof(value));
+//         cout << "[BEFORE WRITE] template_list<T>* " << v->name << ' ' << value << endl;
+//     }
 
-    var* int_var = int_var_construct(value, TYPE_VAR, v);
-    i = var_set.find(int_var);
-    if (i == var_set.end()) {
-        var_set.insert(int_var);
-        v->children.push_back(int_var);
-    } else {
-        free(int_var);
-        (*i)->father.insert(v);
-        v->children.push_back(*i);
-    }
-}
+//     static void log_after_write(var* v) {
+//         template_list* value;
+//         PIN_SafeCopy(&value, v->address, sizeof(value));
+//         cout << "[AFTER WRITE] template_list<T>* " << v->name << ' ' << value << endl;
+//     }
+
+//     static void set_after_write(var* v) {
+//         // print_var(v);
+//         template_list* value;
+//         PIN_SafeCopy(&value, v->address, sizeof(value));
+//         if (invalid_ptr(value))
+//             return;
+
+//         set<var*>::iterator i;
+
+//         // template_list* next
+//         var* template_list_var = template_list_var_construct(&(value->next), TYPE_POINTER, v, "next");
+//         i = var_set.find(template_list_var);
+//         if (i == var_set.end()) {
+//             var_set.insert(template_list_var);
+//             v->children.push_back(template_list_var);
+//             // if valid ptr
+//             if (valid_ptr(value->next)) {
+//                 var to_search;
+//                 to_search.address = value->next;
+//                 auto it = var_set.find(&to_search);
+//                 if (it == var_set.end()) {
+//                     template_list_var->set_after_write(template_list_var);
+//                 } else {
+//                     (*it)->father.insert(template_list_var);
+//                 }
+//             }
+//         } else {
+//             delete template_list_var;
+//             (*i)->father.insert(v);
+//             v->children.push_back(*i);
+//         }
+
+//         // T a
+//         var* T_var = var_construct(&(value->a), TYPE_VAR, v, "a");
+//         i = var_set.find(T_var);
+//         if (i == var_set.end()) {
+//             var_set.insert(T_var);
+//             v->children.push_back(T_var);
+//         } else {
+//             delete T_var;
+//             (*i)->father.insert(v);
+//             v->children.push_back(*i);
+//         }
+
+//         // double* b
+//         var* double_var = double_var_construct(&(value->b), TYPE_POINTER, v, "b");
+//         i = var_set.find(double_var);
+//         if (i == var_set.end()) {
+//             var_set.insert(double_var);
+//             v->children.push_back(double_var);
+//             if (valid_ptr(value->b)) {
+//                 var to_search;
+//                 to_search.address = value->b;
+//                 auto it = var_set.find(&to_search);
+//                 if (it == var_set.end()) {
+//                     double_var->set_after_write(double_var);
+//                 } else {
+//                     (*it)->father.insert(double_var);
+//                 }
+//             }
+//         } else {
+//             delete double_var;
+//             (*i)->father.insert(v);
+//             v->children.push_back(*i);
+//         }
+//         // print_var(v);
+//     }
+// };
+
+

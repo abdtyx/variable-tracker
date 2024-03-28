@@ -4,9 +4,6 @@
 
 using std::cout, std::endl, std::set;
 
-static VOID* l_address = (VOID*)0x555555558158;
-static VOID* l2_address = (VOID*)0x555555558160;
-
 VOID RecordRead(VOID *addr) {
     lock_acquire();
     var to_search;
@@ -197,15 +194,27 @@ int main(int argc, char *argv[]) {
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
     var* root = new var;
     root->address = NULL;
-    var* list_var_l = list_var_construct((void*)l_address, TYPE_POINTER, root, "l");
+    var* list_var_l = list_var_construct((void*)0x555555558158, TYPE_POINTER, root, "l");
     var_set.insert(list_var_l);
 
-    var* list_var_l2 = list_var_construct((void*)l2_address, TYPE_POINTER, root, "l2");
+    var* list_var_l2 = list_var_construct((void*)0x555555558160, TYPE_POINTER, root, "l2");
     var_set.insert(list_var_l2);
+
+    // var* list_var_l = list_var_construct((void*)0x555555558160, TYPE_POINTER, root, "l");
+    // var_set.insert(list_var_l);
+
+    // var* list_var_l2 = list_var_construct((void*)0x555555558170, TYPE_VAR, root, "l2");
+    // var_set.insert(list_var_l2);
+
     // var* int_var = int_var_construct((void*)0x555555558158, TYPE_POINTER, "globall");
     // var_set.insert(int_var);
     // var* list_var = list_var_construct((void*)0x555555558160, TYPE_POINTER, "l");
     // var_set.insert(list_var);
+
+    // var* template_list_l = template_list<int>::template_list_var_construct((void*)0x555555558158, TYPE_POINTER, root, "l");
+    // var_set.insert(template_list_l);
+    // var* template_list_l2 = template_list<int>::template_list_var_construct((void*)0x555555558160, TYPE_POINTER, root, "l2");
+    // var_set.insert(template_list_l2);
 
     cout << "Critical variable set initialized\n";
 
