@@ -3,6 +3,7 @@
 #include <iostream>
 
 using std::cout, std::endl, std::set;
+using vt::lock_acquire, vt::lock_release, vt::var, vt::var_set, vt::list_var_construct, vt::var_construct, vt::template_list;
 
 VOID RecordRead(VOID *addr) {
     lock_acquire();
@@ -189,15 +190,16 @@ VOID InsertInstruction(INS ins, VOID *v) {
 }
 
 int main(int argc, char *argv[]) {
+    // FIXME: This can be wrapped with a helper function, then there will not be too many using 'vt::'s!
     // Initialize var set
     cout << "Initializing critical variable set\n";
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
     var* root = new var;
     root->address = NULL;
-    var* list_var_l = list_var_construct((void*)0x555555558158, TYPE_POINTER, root, "l");
+    var* list_var_l = var_construct<template_list<int>>((void*)0x555555558158, TYPE_POINTER, root, "l");
     var_set.insert(list_var_l);
 
-    var* list_var_l2 = list_var_construct((void*)0x555555558160, TYPE_POINTER, root, "l2");
+    var* list_var_l2 = var_construct<template_list<int>>((void*)0x555555558160, TYPE_POINTER, root, "l2");
     var_set.insert(list_var_l2);
 
     // var* list_var_l = list_var_construct((void*)0x555555558160, TYPE_POINTER, root, "l");
@@ -217,6 +219,7 @@ int main(int argc, char *argv[]) {
     // var_set.insert(template_list_l2);
 
     cout << "Critical variable set initialized\n";
+    // FIXME: End here
 
     // Initialize pin
     PIN_InitSymbols();

@@ -6,12 +6,15 @@
 #include <map>
 #include <string>
 
+#include <boost/type_index.hpp>
+
 #define TYPE_VAR 0
 #define TYPE_POINTER 1
 #define DEFAULT_NAME "__DEFAULT_NAME__"
 
 using std::cout, std::endl, std::vector, std::set, std::map, std::string;
 
+namespace vt {
 template <typename T>
 struct compare_function {
     bool operator()(const T v1, const T v2) const {
@@ -393,101 +396,100 @@ struct log<int> {
     }
 };
 
-// template <typename T>
-// class template_list {
-// public:
-//     T a;
-//     double* b;
-//     template_list* next;
-// };
+template <typename T>
+class template_list {
+public:
+    T a;
+    double* b;
+    template_list* next;
+};
 
-// template <typename U>
-// struct log<template_list<U>> {
-//     static void log_read(var* v) {
-//         template_list* value;
-//         PIN_SafeCopy(&value, v->address, sizeof(value));
-//         cout << "[READ] template_list<T>* " << v->name << ' ' << value << endl;
-//     }
+template <typename T>
+struct log<template_list<T>> {
+    static void log_read(var* v) {
+        template_list<T>* value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[READ] template_list<" << boost::typeindex::type_id<T>().pretty_name() << ">* " << v->name << ' ' << value << endl;
+    }
 
-//     static void log_before_write(var* v) {
-//         template_list* value;
-//         PIN_SafeCopy(&value, v->address, sizeof(value));
-//         cout << "[BEFORE WRITE] template_list<T>* " << v->name << ' ' << value << endl;
-//     }
+    static void log_before_write(var* v) {
+        template_list<T>* value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[BEFORE WRITE] template_list<" << boost::typeindex::type_id<T>().pretty_name() << ">* " << v->name << ' ' << value << endl;
+    }
 
-//     static void log_after_write(var* v) {
-//         template_list* value;
-//         PIN_SafeCopy(&value, v->address, sizeof(value));
-//         cout << "[AFTER WRITE] template_list<T>* " << v->name << ' ' << value << endl;
-//     }
+    static void log_after_write(var* v) {
+        template_list<T>* value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[AFTER WRITE] template_list<" << boost::typeindex::type_id<T>().pretty_name() << ">* " << v->name << ' ' << value << endl;
+    }
 
-//     static void set_after_write(var* v) {
-//         // print_var(v);
-//         template_list* value;
-//         PIN_SafeCopy(&value, v->address, sizeof(value));
-//         if (invalid_ptr(value))
-//             return;
+    static void set_after_write(var* v) {
+        template_list<T>* value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        if (invalid_ptr(value))
+            return;
 
-//         set<var*>::iterator i;
+        set<var*>::iterator i;
 
-//         // template_list* next
-//         var* template_list_var = template_list_var_construct(&(value->next), TYPE_POINTER, v, "next");
-//         i = var_set.find(template_list_var);
-//         if (i == var_set.end()) {
-//             var_set.insert(template_list_var);
-//             v->children.push_back(template_list_var);
-//             // if valid ptr
-//             if (valid_ptr(value->next)) {
-//                 var to_search;
-//                 to_search.address = value->next;
-//                 auto it = var_set.find(&to_search);
-//                 if (it == var_set.end()) {
-//                     template_list_var->set_after_write(template_list_var);
-//                 } else {
-//                     (*it)->father.insert(template_list_var);
-//                 }
-//             }
-//         } else {
-//             delete template_list_var;
-//             (*i)->father.insert(v);
-//             v->children.push_back(*i);
-//         }
+        // template_list* next
+        var* template_list_var = var_construct<template_list<T>>(&(value->next), TYPE_POINTER, v, "next");
+        i = var_set.find(template_list_var);
+        if (i == var_set.end()) {
+            var_set.insert(template_list_var);
+            v->children.push_back(template_list_var);
+            // if valid ptr
+            if (valid_ptr(value->next)) {
+                var to_search;
+                to_search.address = value->next;
+                auto it = var_set.find(&to_search);
+                if (it == var_set.end()) {
+                    template_list_var->set_after_write(template_list_var);
+                } else {
+                    (*it)->father.insert(template_list_var);
+                }
+            }
+        } else {
+            delete template_list_var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
 
-//         // T a
-//         var* T_var = var_construct(&(value->a), TYPE_VAR, v, "a");
-//         i = var_set.find(T_var);
-//         if (i == var_set.end()) {
-//             var_set.insert(T_var);
-//             v->children.push_back(T_var);
-//         } else {
-//             delete T_var;
-//             (*i)->father.insert(v);
-//             v->children.push_back(*i);
-//         }
+        // T a
+        var* T_var = var_construct<T>(&(value->a), TYPE_VAR, v, "a");
+        i = var_set.find(T_var);
+        if (i == var_set.end()) {
+            var_set.insert(T_var);
+            v->children.push_back(T_var);
+        } else {
+            delete T_var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
 
-//         // double* b
-//         var* double_var = double_var_construct(&(value->b), TYPE_POINTER, v, "b");
-//         i = var_set.find(double_var);
-//         if (i == var_set.end()) {
-//             var_set.insert(double_var);
-//             v->children.push_back(double_var);
-//             if (valid_ptr(value->b)) {
-//                 var to_search;
-//                 to_search.address = value->b;
-//                 auto it = var_set.find(&to_search);
-//                 if (it == var_set.end()) {
-//                     double_var->set_after_write(double_var);
-//                 } else {
-//                     (*it)->father.insert(double_var);
-//                 }
-//             }
-//         } else {
-//             delete double_var;
-//             (*i)->father.insert(v);
-//             v->children.push_back(*i);
-//         }
-//         // print_var(v);
-//     }
-// };
-
+        // double* b
+        var* double_var = double_var_construct(&(value->b), TYPE_POINTER, v, "b");
+        i = var_set.find(double_var);
+        if (i == var_set.end()) {
+            var_set.insert(double_var);
+            v->children.push_back(double_var);
+            if (valid_ptr(value->b)) {
+                var to_search;
+                to_search.address = value->b;
+                auto it = var_set.find(&to_search);
+                if (it == var_set.end()) {
+                    double_var->set_after_write(double_var);
+                } else {
+                    (*it)->father.insert(double_var);
+                }
+            }
+        } else {
+            delete double_var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+        // print_var(v);
+    }
+};
+}
 
