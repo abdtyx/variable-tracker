@@ -3,7 +3,7 @@
 #include <iostream>
 
 using std::cout, std::endl, std::set;
-using vt::lock_acquire, vt::lock_release, vt::var, vt::var_set, vt::list_var_construct, vt::var_construct, vt::template_list;
+using vt::lock_acquire, vt::lock_release, vt::var, vt::var_set, vt::list, vt::var_construct, vt::template_list;
 
 VOID RecordRead(VOID *addr) {
     lock_acquire();
@@ -196,17 +196,17 @@ int main(int argc, char *argv[]) {
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
     var* root = new var;
     root->address = NULL;
-    var* list_var_l = var_construct<template_list<int>>((void*)0x555555558158, TYPE_POINTER, root, "l");
-    var_set.insert(list_var_l);
-
-    var* list_var_l2 = var_construct<template_list<int>>((void*)0x555555558160, TYPE_POINTER, root, "l2");
-    var_set.insert(list_var_l2);
-
-    // var* list_var_l = list_var_construct((void*)0x555555558160, TYPE_POINTER, root, "l");
+    // var* list_var_l = var_construct<template_list<int>>((void*)0x555555558158, TYPE_POINTER, root, "l");
     // var_set.insert(list_var_l);
 
-    // var* list_var_l2 = list_var_construct((void*)0x555555558170, TYPE_VAR, root, "l2");
+    // var* list_var_l2 = var_construct<template_list<int>>((void*)0x555555558160, TYPE_POINTER, root, "l2");
     // var_set.insert(list_var_l2);
+
+    var* list_var_l = var_construct<list>((void*)0x555555558158, TYPE_POINTER, root, "l");
+    var_set.insert(list_var_l);
+
+    var* list_var_l2 = var_construct<list>((void*)0x555555558160, TYPE_VAR, root, "l2");
+    var_set.insert(list_var_l2);
 
     // var* int_var = int_var_construct((void*)0x555555558158, TYPE_POINTER, "globall");
     // var_set.insert(int_var);
