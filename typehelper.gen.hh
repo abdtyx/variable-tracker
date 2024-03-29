@@ -443,5 +443,36 @@ struct log<template_list<T>> {
         // print_var(v);
     }
 };
+
+void cvs_init() {
+    // Initialize var set
+    cout << "Initializing critical variable set\n";
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
+    var* root = new var;
+    root->address = NULL;
+    // var* list_var_l = var_construct<template_list<int>>((void*)0x555555558158, TYPE_POINTER, root, "l");
+    // var_set.insert(list_var_l);
+
+    // var* list_var_l2 = var_construct<template_list<int>>((void*)0x555555558160, TYPE_POINTER, root, "l2");
+    // var_set.insert(list_var_l2);
+
+    var* list_var_l = var_construct<list>((void*)0x555555558158, TYPE_POINTER, root, "l");
+    var_set.insert(list_var_l);
+
+    var* list_var_l2 = var_construct<list>((void*)0x555555558160, TYPE_VAR, root, "l2");
+    var_set.insert(list_var_l2);
+
+    // var* int_var = int_var_construct((void*)0x555555558158, TYPE_POINTER, "globall");
+    // var_set.insert(int_var);
+    // var* list_var = list_var_construct((void*)0x555555558160, TYPE_POINTER, "l");
+    // var_set.insert(list_var);
+
+    // var* template_list_l = template_list<int>::template_list_var_construct((void*)0x555555558158, TYPE_POINTER, root, "l");
+    // var_set.insert(template_list_l);
+    // var* template_list_l2 = template_list<int>::template_list_var_construct((void*)0x555555558160, TYPE_POINTER, root, "l2");
+    // var_set.insert(template_list_l2);
+
+    cout << "Critical variable set initialized\n";
+}
 }
 
