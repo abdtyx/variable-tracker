@@ -148,7 +148,7 @@ struct log<T*> {
 };
 
 template <typename T>
-struct mockset {
+struct cvs {
     static void set_before_write(var* v){}
     static void set_after_write(var* v){}
 };
@@ -166,14 +166,14 @@ var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
     v->log_read = l.log_read;
     v->log_before_write = l.log_before_write;
     v->log_after_write = l.log_after_write;
-    mockset<T> s;
+    cvs<T> s;
     v->set_before_write = s.set_before_write;
     v->set_after_write = s.set_after_write;
     return v;
 }
 
 template<>
-struct mockset<list*> {
+struct cvs<list*> {
     void (*set_before_write)(var* v) = general_set_before_write;
 
     static void set_after_write(var* v) {
@@ -246,7 +246,7 @@ struct mockset<list*> {
 };
 
 template<>
-struct mockset<double*> {
+struct cvs<double*> {
     void (*set_before_write)(var* v) = general_set_before_write;
 
     static void set_after_write(var* v) {
@@ -271,7 +271,7 @@ struct mockset<double*> {
 };
 
 template <>
-struct mockset<int*> {
+struct cvs<int*> {
     void (*set_before_write)(var* v) = general_set_before_write;
 
     static void set_after_write(var* v) {
@@ -304,7 +304,7 @@ public:
 };
 
 template <typename T>
-struct mockset<template_list<T>*> {
+struct cvs<template_list<T>*> {
     void (*set_before_write)(var* v) = general_set_before_write;
 
     static void set_after_write(var* v) {
