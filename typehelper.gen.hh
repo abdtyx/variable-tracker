@@ -8,8 +8,8 @@
 
 #include <boost/type_index.hpp>
 
-#define TYPE_VAR 0
-#define TYPE_POINTER 1
+// #define TYPE_VAR 0
+// #define TYPE_POINTER 1
 #define DEFAULT_NAME "__DEFAULT_NAME__"
 
 using std::cout, std::endl, std::vector, std::set, std::map, std::string;
@@ -26,7 +26,7 @@ struct var {
     string name;                              // 变量名
     void* address;                            // 变量地址
     bool invalid;                             // 暂时没用
-    int type;                                 // 变量类型，0为普通变量，1为指针变量
+    // int type;                                 // 变量类型，0为普通变量，1为指针变量
     set<var*, compare_function<var*> > father;// who points at this var
     vector<var*> children;                    // children存储了这个指针指向的所有变量的地址。
     void (*log_read)(var* v);             // Read的log函数
@@ -42,7 +42,7 @@ struct var {
 };
 
 void print_var(var* v, string space = "") {
-    cout << space << "var {name: " << v->name << ", address: " << v->address << ", invalid: " << v->invalid << ", type: " << v->type << ", reference_counter: " << v->father.size() << "}" << endl;
+    cout << space << "var {name: " << v->name << ", address: " << v->address << ", invalid: " << v->invalid << ", reference_counter: " << v->father.size() << "}" << endl;
     cout << space << "children {" << endl;
     space.push_back('\t');
     for (auto i : v->children) {
@@ -95,7 +95,7 @@ public:
     list* next;
 };
 
-void set_before_write(var* v) {
+void general_set_before_write(var* v) {
     for (auto child : v->children) {
         child->father.erase(v);
         if (child->father.size() == 0) {
@@ -111,49 +111,70 @@ void set_before_write(var* v) {
 
 template <typename T>
 struct log {
-    static void log_read(var* v);
-    static void log_before_write(var* v);
-    static void log_after_write(var* v);
-    static void set_after_write(var* v);
+    static void log_read(var* v) {
+        T value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[READ] " << boost::typeindex::type_id<T>().pretty_name() << ' ' << v->name << ' ' << value << endl;
+    }
+    static void log_before_write(var* v) {
+        T value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[BEFORE WRITE] " << boost::typeindex::type_id<T>().pretty_name() << ' ' << v->name << ' ' << value << endl;
+    }
+    static void log_after_write(var* v) {
+        T value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[AFTER WRITE] " << boost::typeindex::type_id<T>().pretty_name() << ' ' << v->name << ' ' << value << endl;
+    }
 };
 
 template <typename T>
-var* var_construct(void* addr, uint64_t type, var* father, string name = DEFAULT_NAME) {
+struct log<T*> {
+    static void log_read(var* v) {
+        T* value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[READ] " << boost::typeindex::type_id<T*>().pretty_name() << ' ' << v->name << ' ' << value << endl;
+    }
+    static void log_before_write(var* v) {
+        T* value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[BEFORE WRITE] " << boost::typeindex::type_id<T*>().pretty_name() << ' ' << v->name << ' ' << value << endl;
+    }
+    static void log_after_write(var* v) {
+        T* value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[AFTER WRITE] " << boost::typeindex::type_id<T*>().pretty_name() << ' ' << v->name << ' ' << value << endl;
+    }
+};
+
+template <typename T>
+struct mockset {
+    static void set_before_write(var* v){}
+    static void set_after_write(var* v){}
+};
+
+template <typename T>
+var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
     var* v = new var;
     v->name = name;
     v->address = (void*)addr;
     v->invalid = false;
     v->children.clear();
     v->father.insert(father);
-    v->type = type;
+    // v->type = type;
     log<T> l;
     v->log_read = l.log_read;
     v->log_before_write = l.log_before_write;
     v->log_after_write = l.log_after_write;
-    v->set_before_write = set_before_write;
-    v->set_after_write = l.set_after_write;
+    mockset<T> s;
+    v->set_before_write = s.set_before_write;
+    v->set_after_write = s.set_after_write;
     return v;
 }
 
 template<>
-struct log<list> {
-    static void log_read(var* v) {
-        list* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[READ] list* " << v->name << ' ' << value << endl;
-    }
-
-    static void log_before_write(var* v) {
-        list* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[BEFORE WRITE] list* " << v->name << ' ' << value << endl;
-    }
-
-    static void log_after_write(var* v) {
-        list* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[AFTER WRITE] list* " << v->name << ' ' << value << endl;
-    }
+struct mockset<list*> {
+    void (*set_before_write)(var* v) = general_set_before_write;
 
     static void set_after_write(var* v) {
         // print_var(v);
@@ -165,7 +186,7 @@ struct log<list> {
         set<var*>::iterator i;
 
         // list* next
-        var* list_var = var_construct<list>(&(value->next), TYPE_POINTER, v, "next");
+        var* list_var = var_construct<list*>(&(value->next), v, "next");
         i = var_set.find(list_var);
         if (i == var_set.end()) {
             var_set.insert(list_var);
@@ -188,7 +209,7 @@ struct log<list> {
         }
 
         // int a
-        var* int_var = var_construct<int>(&(value->a), TYPE_VAR, v, "a");
+        var* int_var = var_construct<int>(&(value->a), v, "a");
         i = var_set.find(int_var);
         if (i == var_set.end()) {
             var_set.insert(int_var);
@@ -200,7 +221,7 @@ struct log<list> {
         }
 
         // double* b
-        var* double_var = var_construct<double>(&(value->b), TYPE_POINTER, v, "b");
+        var* double_var = var_construct<double*>(&(value->b), v, "b");
         i = var_set.find(double_var);
         if (i == var_set.end()) {
             var_set.insert(double_var);
@@ -225,45 +246,8 @@ struct log<list> {
 };
 
 template<>
-struct log<double> {
-    static void log_read(var* v) {
-        if (v->type == TYPE_VAR) {
-            double value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[READ] double " << v->name << ' ' << value << endl;
-        }
-        else if (v->type == TYPE_POINTER) {
-            double* value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[READ] double* " << v->name << ' ' << value << endl;
-        }
-    }
-
-    static void log_before_write(var* v) {
-        if (v->type == TYPE_VAR) {
-            double value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[BEFORE WRITE] double " << v->name << ' ' << value << endl;
-        }
-        else if (v->type == TYPE_POINTER) {
-            double* value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[BEFORE WRITE] double* " << v->name << ' ' << value << endl;
-        }
-    }
-
-    static void log_after_write(var* v) {
-        if (v->type == TYPE_VAR) {
-            double value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[AFTER WRITE] double " << v->name << ' ' << value << endl;
-        }
-        else if (v->type == TYPE_POINTER) {
-            double* value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[AFTER WRITE] double* " << v->name << ' ' << value << endl;
-        }
-    }
+struct mockset<double*> {
+    void (*set_before_write)(var* v) = general_set_before_write;
 
     static void set_after_write(var* v) {
         double* value;
@@ -273,7 +257,7 @@ struct log<double> {
 
         set<var*>::iterator i;
 
-        var* double_var = var_construct<double>(value, TYPE_VAR, v);
+        var* double_var = var_construct<double>(value, v);
         i = var_set.find(double_var);
         if (i == var_set.end()) {
             var_set.insert(double_var);
@@ -287,45 +271,8 @@ struct log<double> {
 };
 
 template <>
-struct log<int> {
-    static void log_read(var* v) {
-        if (v->type == TYPE_VAR) {
-            int value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[READ] int " << v->name << ' ' << value << endl;
-        }
-        else if (v->type == TYPE_POINTER) {
-            int* value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[READ] int* " << v->name << ' ' << value << endl;
-        }
-    }
-
-    static void log_before_write(var* v) {
-        if (v->type == TYPE_VAR) {
-            int value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[BEFORE WRITE] int " << v->name << ' ' << value << endl;
-        }
-        else if (v->type == TYPE_POINTER) {
-            int* value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[BEFORE WRITE] int* " << v->name << ' ' << value << endl;
-        }
-    }
-
-    static void log_after_write(var* v) {
-        if (v->type == TYPE_VAR) {
-            int value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[AFTER WRITE] int " << v->name << ' ' << value << endl;
-        }
-        else if (v->type == TYPE_POINTER) {
-            int* value;
-            PIN_SafeCopy(&value, v->address, sizeof(value));
-            cout << "[AFTER WRITE] int* " << v->name << ' ' << value << endl;
-        }
-    }
+struct mockset<int*> {
+    void (*set_before_write)(var* v) = general_set_before_write;
 
     static void set_after_write(var* v) {
         int* value;
@@ -335,7 +282,7 @@ struct log<int> {
 
         set<var*>::iterator i;
 
-        var* int_var = var_construct<int>(value, TYPE_VAR, v);
+        var* int_var = var_construct<int>(value, v);
         i = var_set.find(int_var);
         if (i == var_set.end()) {
             var_set.insert(int_var);
@@ -357,24 +304,8 @@ public:
 };
 
 template <typename T>
-struct log<template_list<T>> {
-    static void log_read(var* v) {
-        template_list<T>* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[READ] template_list<" << boost::typeindex::type_id<T>().pretty_name() << ">* " << v->name << ' ' << value << endl;
-    }
-
-    static void log_before_write(var* v) {
-        template_list<T>* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[BEFORE WRITE] template_list<" << boost::typeindex::type_id<T>().pretty_name() << ">* " << v->name << ' ' << value << endl;
-    }
-
-    static void log_after_write(var* v) {
-        template_list<T>* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
-        cout << "[AFTER WRITE] template_list<" << boost::typeindex::type_id<T>().pretty_name() << ">* " << v->name << ' ' << value << endl;
-    }
+struct mockset<template_list<T>*> {
+    void (*set_before_write)(var* v) = general_set_before_write;
 
     static void set_after_write(var* v) {
         template_list<T>* value;
@@ -385,7 +316,7 @@ struct log<template_list<T>> {
         set<var*>::iterator i;
 
         // template_list* next
-        var* template_list_var = var_construct<template_list<T>>(&(value->next), TYPE_POINTER, v, "next");
+        var* template_list_var = var_construct<template_list<T>*>(&(value->next), v, "next");
         i = var_set.find(template_list_var);
         if (i == var_set.end()) {
             var_set.insert(template_list_var);
@@ -408,7 +339,7 @@ struct log<template_list<T>> {
         }
 
         // T a
-        var* T_var = var_construct<T>(&(value->a), TYPE_VAR, v, "a");
+        var* T_var = var_construct<T>(&(value->a), v, "a");
         i = var_set.find(T_var);
         if (i == var_set.end()) {
             var_set.insert(T_var);
@@ -420,7 +351,7 @@ struct log<template_list<T>> {
         }
 
         // double* b
-        var* double_var = var_construct<double>(&(value->b), TYPE_POINTER, v, "b");
+        var* double_var = var_construct<double*>(&(value->b), v, "b");
         i = var_set.find(double_var);
         if (i == var_set.end()) {
             var_set.insert(double_var);
@@ -456,11 +387,11 @@ void cvs_init() {
     // var* list_var_l2 = var_construct<template_list<int>>((void*)0x555555558160, TYPE_POINTER, root, "l2");
     // var_set.insert(list_var_l2);
 
-    var* list_var_l = var_construct<list>((void*)0x555555558158, TYPE_POINTER, root, "l");
+    var* list_var_l = var_construct<list*>((void*)0x555555558158, root, "l");
     var_set.insert(list_var_l);
 
-    var* list_var_l2 = var_construct<list>((void*)0x555555558160, TYPE_VAR, root, "l2");
-    var_set.insert(list_var_l2);
+    // var* list_var_l2 = var_construct<list>((void*)0x555555558160, TYPE_VAR, root, "l2");
+    // var_set.insert(list_var_l2);
 
     // var* int_var = int_var_construct((void*)0x555555558158, TYPE_POINTER, "globall");
     // var_set.insert(int_var);

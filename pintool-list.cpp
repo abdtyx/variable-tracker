@@ -24,9 +24,9 @@ VOID BeforeWrite(VOID *addr) {
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_before_write((*it));
-        if ((*it)->type == TYPE_POINTER) {
+        // if ((*it)->type == TYPE_POINTER) {
             (*it)->set_before_write(*it);
-        }
+        // }
     }
     lock_release();
 }
@@ -39,10 +39,10 @@ VOID AfterWrite(VOID *addr) {
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_after_write((*it));
-        if ((*it)->type == TYPE_POINTER) {
+        // if ((*it)->type == TYPE_POINTER) {
             (*it)->set_after_write(*it);
             // print_var(*it);
-        }
+        // }
     }
     lock_release();
 }
