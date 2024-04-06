@@ -24,9 +24,7 @@ VOID BeforeWrite(VOID *addr) {
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_before_write((*it));
-        // if ((*it)->type == TYPE_POINTER) {
-            (*it)->set_before_write(*it);
-        // }
+        (*it)->set_before_write(*it);
     }
     lock_release();
 }
@@ -39,10 +37,8 @@ VOID AfterWrite(VOID *addr) {
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_after_write((*it));
-        // if ((*it)->type == TYPE_POINTER) {
-            (*it)->set_after_write(*it);
-            // print_var(*it);
-        // }
+        (*it)->set_after_write(*it);
+        // print_var(*it);
     }
     lock_release();
 }
@@ -55,11 +51,6 @@ VOID BeforeFree(VOID* addr) {
     to_search.address = addr;
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
-        // auto clear = (*it)->father.begin();
-        // if (clear != (*it)->father.end()) {
-        //     // The father must be a TYPE_POINTER
-        //     (*clear)->set_before_write(*clear);
-        // }
         // find all children
         set<var*> children;
         for (auto i : (*it)->father)
@@ -74,18 +65,6 @@ VOID BeforeFree(VOID* addr) {
         for (auto i : fathers)
             i->set_before_write(i);
     }
-    // var to_search;
-    // to_search.address = addr;
-    // auto it = var_set.find(&to_search);
-    // if (it != var_set.end()) {
-    //     print_var(*it);
-    //     if ((*it)->type == TYPE_POINTER) {
-    //         (*it)->set_before_write(*it);
-    //         var_set.erase(it);
-    //         // copy addr?
-    //         free(*it);
-    //     }
-    // }
     lock_release();
 }
 
@@ -96,20 +75,7 @@ VOID BeforeLeave(ADDRINT rbp, ADDRINT rsp) {
     vector<var*> dirty;
     for (auto i : var_set) {
         if ((uint64_t)i->address >= start && (uint64_t)i->address < end) {
-            dirty.push_back(i);
-            /*
-            if (i->type == TYPE_POINTER) {
-                // void* key;
-                // PIN_SafeCopy(&key, i->address, sizeof(key));
-                // // call remove
-                // ptr_addr_remove(key, i->address);
-                // call set_before_write
-                i->set_before_write(i);
-            } else if (i->type == TYPE_VAR) {
-                // call erase
-                ptr_addr.erase(i->address);
-            }
-            */            
+            dirty.push_back(i);     
         }
     }
     // find all fathers

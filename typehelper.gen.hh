@@ -1,6 +1,3 @@
-// This issue is discussed by https://shaojiemike.top/page/9/#c-program-compile-problems in section 5.1
-// typedef uint16_t Elf64_Section;
-
 #include "pin.H"
 #include <iostream>
 #include <stdlib.h>
@@ -16,8 +13,6 @@
 
 #include <boost/type_index.hpp>
 
-// #define TYPE_VAR 0
-// #define TYPE_POINTER 1
 #define DEFAULT_NAME "__DEFAULT_NAME__"
 
 using std::cout, std::endl, std::vector, std::set, std::map, std::string;
@@ -34,7 +29,6 @@ struct var {
     string name;                              // 变量名
     void* address;                            // 变量地址
     bool invalid;                             // 暂时没用
-    // int type;                                 // 变量类型，0为普通变量，1为指针变量
     set<var*, compare_function<var*> > father;// who points at this var
     vector<var*> children;                    // children存储了这个指针指向的所有变量的地址。
     void (*log_read)(var* v);             // Read的log函数
