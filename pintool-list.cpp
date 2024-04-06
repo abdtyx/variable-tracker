@@ -37,7 +37,7 @@ VOID AfterWrite(VOID *addr) {
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_after_write((*it));
-        (*it)->set_after_write(*it);
+        (*it)->set_after_write(*it, DEFAULT_DELIMITER);
         // print_var(*it);
     }
     lock_release();
