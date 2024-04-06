@@ -1,3 +1,6 @@
+// This issue is discussed by https://shaojiemike.top/page/9/#c-program-compile-problems in section 5.1
+// typedef uint16_t Elf64_Section;
+
 #include "pin.H"
 #include <iostream>
 #include <stdlib.h>
@@ -5,6 +8,11 @@
 #include <set>
 #include <map>
 #include <string>
+#include <elf.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 
 #include <boost/type_index.hpp>
 
@@ -152,6 +160,32 @@ struct cvs {
     static void set_before_write(var* v){}
     static void set_after_write(var* v){}
 };
+
+// support multi-pointers
+// template <typename T>
+// struct cvs<T*> {
+//     void (*set_before_write)(var* v) = general_set_before_write;
+
+//     static void set_after_write(var* v) {
+//         T* value;
+//         PIN_SafeCopy(&value, v->address, sizeof(value));
+//         if (invalid_ptr(value))
+//             return;
+
+//         set<var*>::iterator i;
+
+//         var* T_var = var_construct<T>(value, v, "*" + v->name);
+//         i = var_set.find(T_var);
+//         if (i == var_set.end()) {
+//             var_set.insert(T_var);
+//             v->children.push_back(T_var);
+//         } else {
+//             delete T_var;
+//             (*i)->father.insert(v);
+//             v->children.push_back(*i);
+//         }
+//     }
+// };
 
 template <typename T>
 var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
@@ -375,35 +409,115 @@ struct cvs<template_list<T>*> {
     }
 };
 
-void cvs_init() {
+// CVS INIT
+struct _compare_function {
+    bool operator()(const var* v1, const var* v2) const {
+        return v1->name < v2->name;
+    }
+};
+
+void cvs_init(string app_name) {
+    set<var*, _compare_function> _vars;
+    uint64_t base_address;
     // Initialize var set
     cout << "Initializing critical variable set\n";
+
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
     var* root = new var;
     root->address = NULL;
-    // var* list_var_l = var_construct<template_list<int>>((void*)0x555555558158, TYPE_POINTER, root, "l");
-    // var_set.insert(list_var_l);
+    _vars.insert(var_construct<list*>(0, root, "l"));
+    _vars.insert(var_construct<list*>(0, root, "l2"));
 
-    // var* list_var_l2 = var_construct<template_list<int>>((void*)0x555555558160, TYPE_POINTER, root, "l2");
-    // var_set.insert(list_var_l2);
+    // get base address
+    int fd = open("/proc/self/maps", O_RDONLY);
+    if (fd < 0) exit(-1);
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    read(fd, buf, 500);
+    if (strstr(buf, app_name.c_str())) {
+        if (sscanf(buf, "%lx", &base_address) <= 0) {
+            close(fd);
+            exit(-1);
+        }
+    } else {
+        close(fd);
+        exit(-1);
+    }
+    printf("Program base address: %lx\n", base_address);
+    close(fd);
 
-    var* list_var_l = var_construct<list*>((void*)0x555555558158, root, "l");
-    var_set.insert(list_var_l);
+    // find global variable by name
+    fd = open(app_name.c_str(), O_RDONLY);
+    if (fd < 0) {
+        cout << app_name << " not found\n";
+        exit(-1);
+    }
 
-    // var* list_var_l2 = var_construct<list>((void*)0x555555558160, TYPE_VAR, root, "l2");
-    // var_set.insert(list_var_l2);
+    struct stat st;
+    void *data;
+    Elf64_Ehdr *ehdr;
+    Elf64_Shdr *shdr;
+    Elf64_Sym *symtab;
+    char *strtab;
 
-    // var* int_var = int_var_construct((void*)0x555555558158, TYPE_POINTER, "globall");
-    // var_set.insert(int_var);
-    // var* list_var = list_var_construct((void*)0x555555558160, TYPE_POINTER, "l");
-    // var_set.insert(list_var);
+    // Get file information
+    fstat(fd, &st);
 
-    // var* template_list_l = template_list<int>::template_list_var_construct((void*)0x555555558158, TYPE_POINTER, root, "l");
-    // var_set.insert(template_list_l);
-    // var* template_list_l2 = template_list<int>::template_list_var_construct((void*)0x555555558160, TYPE_POINTER, root, "l2");
-    // var_set.insert(template_list_l2);
+    // Map the ELF file into memory
+    data = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (data == MAP_FAILED) {
+        cout << "mmap failed\n";
+        close(fd);
+        exit(-1);
+    }
+
+    // Pointers to ELF header and section header table
+    ehdr = (Elf64_Ehdr *) data;
+    shdr = (Elf64_Shdr *) ((uint64_t)data + ehdr->e_shoff);
+
+    // Find the symbol table section
+    Elf64_Shdr *symtab_hdr = NULL;
+    for (int i = 0; i < ehdr->e_shnum; i++) {
+        if (shdr[i].sh_type == SHT_SYMTAB) {
+            symtab_hdr = &shdr[i];
+            break;
+        }
+    }
+
+    if (symtab_hdr == NULL) {
+        cout << "Symbol table section not found\n";
+        munmap(data, st.st_size);
+        close(fd);
+        exit(-1);
+    }
+
+    // Get symbol table and string table pointers
+    symtab = (Elf64_Sym *) ((uint64_t)data + symtab_hdr->sh_offset);
+    strtab = (char *) ((uint64_t)data + shdr[symtab_hdr->sh_link].sh_offset);
+
+    // Iterate through symbols and print them
+    for (size_t i = 0; i < symtab_hdr->sh_size / sizeof(Elf64_Sym); i++) {
+        string vname(&strtab[symtab[i].st_name]);
+        var to_search;
+        to_search.name = vname;
+        auto it = _vars.find(&to_search);
+        if (it != _vars.end()) {
+            (*it)->address = (void*)(base_address + symtab[i].st_value);
+            var_set.insert(*it);
+            cout << "Found variable " << vname << " at address " << (*it)->address << endl;
+        }
+    }
+
+    // Clean up
+    for (auto j : _vars) {
+        if (j->address == 0) delete j;
+    }
+    _vars.clear();
+    munmap(data, st.st_size);
+    close(fd);
 
     cout << "Critical variable set initialized\n";
+    fflush(stdout);
 }
 }
 

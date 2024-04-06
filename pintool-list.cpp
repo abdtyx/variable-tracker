@@ -136,6 +136,13 @@ VOID BeforeLeave(ADDRINT rbp, ADDRINT rsp) {
 }
 
 VOID Image(IMG img, VOID* v) {
+    // search application name
+    string app_name = IMG_Name(img);
+    if (app_name.find("/home") == 0) {
+        cout << "Target program: " << app_name << endl;
+        // Initialize cvs
+        vt::cvs_init(app_name);
+    }
     // Find the free() function.
     RTN freeRtn = RTN_FindByName(img, "free");
     if (RTN_Valid(freeRtn)) {
@@ -190,9 +197,6 @@ VOID InsertInstruction(INS ins, VOID *v) {
 }
 
 int main(int argc, char *argv[]) {
-    // Initialize cvs
-    vt::cvs_init();
-
     // Initialize pin
     PIN_InitSymbols();
     if (PIN_Init(argc, argv)) return -1;
