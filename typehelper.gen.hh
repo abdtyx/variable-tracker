@@ -215,7 +215,7 @@ struct cvs<list*> {
         set<var*>::iterator i;
 
         // list* next
-        var* list_var = var_construct<list*>(&(value->next), v, "next");
+        var* list_var = var_construct<list*>(&(value->next), v, v->name + delimiter + "next");
         i = var_set.find(list_var);
         if (i == var_set.end()) {
             var_set.insert(list_var);
@@ -238,7 +238,7 @@ struct cvs<list*> {
         }
 
         // int a
-        var* int_var = var_construct<int>(&(value->a), v, "a");
+        var* int_var = var_construct<int>(&(value->a), v, v->name + delimiter + "a");
         i = var_set.find(int_var);
         if (i == var_set.end()) {
             var_set.insert(int_var);
@@ -250,7 +250,7 @@ struct cvs<list*> {
         }
 
         // double* b
-        var* double_var = var_construct<double*>(&(value->b), v, "b");
+        var* double_var = var_construct<double*>(&(value->b), v, v->name + delimiter + "b");
         i = var_set.find(double_var);
         if (i == var_set.end()) {
             var_set.insert(double_var);
@@ -345,7 +345,7 @@ struct cvs<template_list<T>*> {
         set<var*>::iterator i;
 
         // template_list* next
-        var* template_list_var = var_construct<template_list<T>*>(&(value->next), v, "next");
+        var* template_list_var = var_construct<template_list<T>*>(&(value->next), v, v->name + delimiter + "next");
         i = var_set.find(template_list_var);
         if (i == var_set.end()) {
             var_set.insert(template_list_var);
@@ -368,7 +368,7 @@ struct cvs<template_list<T>*> {
         }
 
         // T a
-        var* T_var = var_construct<T>(&(value->a), v, "a");
+        var* T_var = var_construct<T>(&(value->a), v, v->name + delimiter + "a");
         i = var_set.find(T_var);
         if (i == var_set.end()) {
             var_set.insert(T_var);
@@ -380,7 +380,7 @@ struct cvs<template_list<T>*> {
         }
 
         // double* b
-        var* double_var = var_construct<double*>(&(value->b), v, "b");
+        var* double_var = var_construct<double*>(&(value->b), v, v->name + delimiter + "b");
         i = var_set.find(double_var);
         if (i == var_set.end()) {
             var_set.insert(double_var);
