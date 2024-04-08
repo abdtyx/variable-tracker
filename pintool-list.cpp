@@ -26,7 +26,7 @@ VOID BeforeWrite(VOID *addr, ADDRINT rsp) {
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_before_write((*it));
-        (*it)->set_before_write(*it);
+        (*it)->cvs_before_write(*it);
     }
     lock_release();
 }
@@ -40,7 +40,7 @@ VOID AfterWrite(VOID *addr, ADDRINT rsp) {
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_after_write((*it));
-        (*it)->set_after_write(*it, DEFAULT_DELIMITER);
+        (*it)->cvs_after_write(*it, DEFAULT_DELIMITER);
         // print_var(*it);
     }
     lock_release();
@@ -67,7 +67,7 @@ VOID BeforeFree(VOID* addr, ADDRINT rsp) {
                 fathers.insert(j);
         // call set_before_write on all fathers
         for (auto i : fathers)
-            i->set_before_write(i);
+            i->cvs_before_write(i);
     }
     lock_release();
 }
@@ -90,7 +90,7 @@ VOID BeforeLeave(ADDRINT rbp, ADDRINT rsp) {
             fathers.insert(j);
     // call set_before_write on all fathers
     for (auto i : fathers)
-        i->set_before_write(i);
+        i->cvs_before_write(i);
     // clean the rest of the dirty memory
     for (auto i : dirty) {
         if (var_set.erase(i))
