@@ -40,7 +40,7 @@ VOID AfterWrite(VOID *addr, ADDRINT rsp) {
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
         (*it)->log_after_write((*it));
-        (*it)->cvs_after_write(*it, DEFAULT_DELIMITER);
+        (*it)->cvs_after_write(*it, DEFAULT_DELIMITER, (*it)->address);
         // print_var(*it);
     }
     lock_release();

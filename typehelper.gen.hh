@@ -42,7 +42,7 @@ struct var {
     void (*log_before_write)(var* v);     // BeforeWrite的log函数
     void (*log_after_write)(var* v);      // AfterWrite的log函数
     void (*cvs_before_write)(var* v);     // 在BeforeWrite中操作set的函数
-    void (*cvs_after_write)(var* v, string delimiter);      // 在AfterWrite中操作set的函数
+    void (*cvs_after_write)(var* v, string delimiter, void* address);      // 在AfterWrite中操作set的函数
 
     // compare function
     bool operator()(const var* v1, const var* v2) const {
@@ -175,7 +175,7 @@ void general_cvs_before_write(var* v) {
 template <typename T>
 struct cvs {
     static void cvs_before_write(var* v){}
-    static void cvs_after_write(var* v, string delimiter){}
+    static void cvs_after_write(var* v, string delimiter, void* address){}
 };
 
 template <typename T>
@@ -202,9 +202,9 @@ template <typename T>
 struct cvs<T*> {
     void (*cvs_before_write)(var* v) = general_cvs_before_write;
 
-    static void cvs_after_write(var* v, string delimiter) {
+    static void cvs_after_write(var* v, string delimiter, void* address) {
         T* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
+        PIN_SafeCopy(&value, address, sizeof(value));
         if (invalid_ptr(value))
             return;
 
@@ -222,7 +222,7 @@ struct cvs<T*> {
                 to_search.address = ptr;
                 auto it = var_set.find(&to_search);
                 if (it == var_set.end()) {
-                    T_var->cvs_after_write(T_var, DEFAULT_DELIMITER);
+                    T_var->cvs_after_write(T_var, DEFAULT_DELIMITER, T_var->address);
                 } else {
                     (*it)->father.insert(T_var);
                 }
@@ -239,10 +239,10 @@ template<>
 struct cvs<list*> {
     void (*cvs_before_write)(var* v) = general_cvs_before_write;
 
-    static void cvs_after_write(var* v, string delimiter) {
+    static void cvs_after_write(var* v, string delimiter, void* address) {
         // print_var(v);
         list* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
+        PIN_SafeCopy(&value, address, sizeof(value));
         if (invalid_ptr(value))
             return;
 
@@ -260,7 +260,7 @@ struct cvs<list*> {
                 to_search.address = value->next;
                 auto it = var_set.find(&to_search);
                 if (it == var_set.end()) {
-                    list_var->cvs_after_write(list_var, DEFAULT_DELIMITER);
+                    list_var->cvs_after_write(list_var, DEFAULT_DELIMITER, list_var->address);
                 } else {
                     (*it)->father.insert(list_var);
                 }
@@ -294,7 +294,7 @@ struct cvs<list*> {
                 to_search.address = value->b;
                 auto it = var_set.find(&to_search);
                 if (it == var_set.end()) {
-                    double_var->cvs_after_write(double_var, DEFAULT_DELIMITER);
+                    double_var->cvs_after_write(double_var, DEFAULT_DELIMITER, double_var->address);
                 } else {
                     (*it)->father.insert(double_var);
                 }
@@ -312,9 +312,9 @@ struct cvs<list*> {
 // struct cvs<double*> {
 //     void (*cvs_before_write)(var* v) = general_cvs_before_write;
 
-//     static void cvs_after_write(var* v, string delimiter) {
+//     static void cvs_after_write(var* v, string delimiter, void* address) {
 //         double* value;
-//         PIN_SafeCopy(&value, v->address, sizeof(value));
+//         PIN_SafeCopy(&value, address, sizeof(value));
 //         if (invalid_ptr(value))
 //             return;
 
@@ -337,9 +337,9 @@ struct cvs<list*> {
 // struct cvs<int*> {
 //     void (*cvs_before_write)(var* v) = general_cvs_before_write;
 
-//     static void cvs_after_write(var* v, string delimiter) {
+//     static void cvs_after_write(var* v, string delimiter, void* address) {
 //         int* value;
-//         PIN_SafeCopy(&value, v->address, sizeof(value));
+//         PIN_SafeCopy(&value, address, sizeof(value));
 //         if (invalid_ptr(value))
 //             return;
 
@@ -370,9 +370,9 @@ template <typename T>
 struct cvs<template_list<T>*> {
     void (*cvs_before_write)(var* v) = general_cvs_before_write;
 
-    static void cvs_after_write(var* v, string delimiter) {
+    static void cvs_after_write(var* v, string delimiter, void* address) {
         template_list<T>* value;
-        PIN_SafeCopy(&value, v->address, sizeof(value));
+        PIN_SafeCopy(&value, address, sizeof(value));
         if (invalid_ptr(value))
             return;
 
@@ -390,7 +390,7 @@ struct cvs<template_list<T>*> {
                 to_search.address = value->next;
                 auto it = var_set.find(&to_search);
                 if (it == var_set.end()) {
-                    template_list_var->cvs_after_write(template_list_var, DEFAULT_DELIMITER);
+                    template_list_var->cvs_after_write(template_list_var, DEFAULT_DELIMITER, template_list_var->address);
                 } else {
                     (*it)->father.insert(template_list_var);
                 }
@@ -425,7 +425,7 @@ struct cvs<template_list<T>*> {
                 to_search.address = value->b;
                 auto it = var_set.find(&to_search);
                 if (it == var_set.end()) {
-                    double_var->cvs_after_write(double_var, DEFAULT_DELIMITER);
+                    double_var->cvs_after_write(double_var, DEFAULT_DELIMITER, double_var->address);
                 } else {
                     (*it)->father.insert(double_var);
                 }
