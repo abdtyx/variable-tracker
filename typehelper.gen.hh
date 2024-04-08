@@ -44,6 +44,11 @@ struct var {
     }
 };
 
+set<var*, compare_function<var*> > var_set;
+uint64_t base_address = 0;
+uint64_t stack_start = 0;
+uint64_t rsp = 0;   // rsp is typically lower than stack_start
+
 void print_var(var* v, string space = "") {
     cout << space << "var {name: " << v->name << ", address: " << v->address << ", invalid: " << v->invalid << ", reference_counter: " << v->father.size() << "}" << endl;
     cout << space << "children {" << endl;
@@ -60,17 +65,12 @@ bool valid_ptr(void* addr) {
     uint64_t value = (uint64_t)addr;
     value >>= 40;
     // cout << "[value]: " << value << endl;
-    return (value == 0x55 || value == 0x7f);
+    return (value == 0x55 || (value >= rsp && value < stack_start));
 }
 
 bool invalid_ptr(void* addr) {
     return !valid_ptr(addr);
 }
-
-set<var*, compare_function<var*> > var_set;
-uint64_t base_address = 0;
-uint64_t stack_start = 0;
-uint64_t rsp = 0;   // rsp is typically lower than stack_start
 
 // spin-lock
 #include <stdatomic.h>
