@@ -72,9 +72,9 @@ uint64_t rsp = 0;   // rsp is typically lower than stack_start
 bool valid_ptr(void* addr) {
     // cout << "[validate]: " << addr << endl;
     uint64_t value = (uint64_t)addr;
-    value >>= 40;
+    // value >>= 40;
     // cout << "[value]: " << value << endl;
-    return (value == 0x55 || (value >= rsp && value < stack_start));
+    return ((value >> 40) == 0x55 || (value >= rsp && value < stack_start));
 }
 
 bool invalid_ptr(void* addr) {
@@ -475,11 +475,12 @@ void cvs_init(string app_name) {
     // Initialize var set
     cout << "Initializing critical variable set\n";
 
+    // FIXME: Currently not support automatically seeking addresses of global struct value
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
     var* root = new var;
     root->address = NULL;
-    _vars.insert(var_construct<list*>(0, root, "l"));
-    _vars.insert(var_construct<list*>(0, root, "l2"));
+    _vars.insert(var_construct<template_list<list>*>(0, root, "l"));
+    _vars.insert(var_construct<template_list<list>*>(0, root, "l2"));
     delete root;
 
     // get base address and the start address of stack
