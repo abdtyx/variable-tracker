@@ -19,6 +19,10 @@
 using std::cout, std::endl, std::vector, std::set, std::map, std::string;
 
 namespace vt {
+
+/////////////////////////////////////////////
+////////////////// var //////////////////////
+/////////////////////////////////////////////
 template <typename T>
 struct compare_function {
     bool operator()(const T v1, const T v2) const {
@@ -44,11 +48,6 @@ struct var {
     }
 };
 
-set<var*, compare_function<var*> > var_set;
-uint64_t base_address = 0;
-uint64_t stack_start = 0;
-uint64_t rsp = 0;   // rsp is typically lower than stack_start
-
 void print_var(var* v, string space = "") {
     cout << space << "var {name: " << v->name << ", address: " << v->address << ", invalid: " << v->invalid << ", reference_counter: " << v->father.size() << "}" << endl;
     cout << space << "children {" << endl;
@@ -59,6 +58,14 @@ void print_var(var* v, string space = "") {
     space.pop_back();
     cout << space << "}" << endl;
 }
+
+////////////////////////////////////////////////////////
+////////////////// ptr validation //////////////////////
+////////////////////////////////////////////////////////
+set<var*, compare_function<var*> > var_set;
+uint64_t base_address = 0;
+uint64_t stack_start = 0;
+uint64_t rsp = 0;   // rsp is typically lower than stack_start
 
 bool valid_ptr(void* addr) {
     // cout << "[validate]: " << addr << endl;
@@ -72,7 +79,9 @@ bool invalid_ptr(void* addr) {
     return !valid_ptr(addr);
 }
 
-// spin-lock
+///////////////////////////////////////////////////
+////////////////// spin-lock //////////////////////
+///////////////////////////////////////////////////
 #include <stdatomic.h>
 #include <sched.h>
 
@@ -87,34 +96,9 @@ void lock_release() {
     atomic_flag_clear(&lock);
 }
 
-// list
-
-// struct list {
-//     int a;
-//     double* b;
-//     struct list* next;
-// };
-class list {
-public:
-    int a;
-    double* b;
-    list* next;
-};
-
-void general_set_before_write(var* v) {
-    for (auto child : v->children) {
-        child->father.erase(v);
-        if (child->father.size() == 0) {
-            child->set_before_write(child);
-            // cout << var_set.size() << endl;
-            var_set.erase(child);
-            // cout << var_set.size() << endl;
-            delete child;
-        }
-    }
-    v->children.clear();
-}
-
+/////////////////////////////////////////////
+////////////////// log //////////////////////
+/////////////////////////////////////////////
 template <typename T>
 struct log {
     static void log_read(var* v) {
@@ -153,6 +137,39 @@ struct log<T*> {
     }
 };
 
+//////////////////////////////////////////////////////////
+////////////////// type declaration //////////////////////
+//////////////////////////////////////////////////////////
+// list
+// struct list {
+//     int a;
+//     double* b;
+//     struct list* next;
+// };
+class list {
+public:
+    int a;
+    double* b;
+    list* next;
+};
+
+void general_set_before_write(var* v) {
+    for (auto child : v->children) {
+        child->father.erase(v);
+        if (child->father.size() == 0) {
+            child->set_before_write(child);
+            // cout << var_set.size() << endl;
+            var_set.erase(child);
+            // cout << var_set.size() << endl;
+            delete child;
+        }
+    }
+    v->children.clear();
+}
+
+/////////////////////////////////////////////
+////////////////// cvs //////////////////////
+/////////////////////////////////////////////
 template <typename T>
 struct cvs {
     static void set_before_write(var* v){}
