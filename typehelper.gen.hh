@@ -13,6 +13,8 @@
 
 #include <boost/type_index.hpp>
 
+#include "dma_tbl.hh"
+
 #define DEFAULT_NAME "__DEFAULT_NAME__"
 #define DEFAULT_DELIMITER "->"
 
