@@ -216,7 +216,8 @@ struct cvs<T*> {
             var_set.insert(T_var);
             v->children.push_back(T_var);
             // FIXME: *value could be tricky to get right
-            void* ptr = (void*)(uint64_t)(*value);
+            void* ptr;
+            PIN_SafeCopy(&ptr, value, sizeof(ptr));
             if (valid_ptr(ptr)) {
                 var to_search;
                 to_search.address = ptr;
