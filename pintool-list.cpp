@@ -5,8 +5,9 @@
 using std::cout, std::endl, std::set;
 using vt::lock_acquire, vt::lock_release, vt::var_set, vt::var;
 
-VOID RecordRead(VOID *addr) {
+VOID RecordRead(VOID *addr, ADDRINT rsp) {
     lock_acquire();
+    vt::rsp = rsp;
     var to_search;
     to_search.address = addr;
     auto it = var_set.find(&to_search);
@@ -17,8 +18,9 @@ VOID RecordRead(VOID *addr) {
 }
 
 // When the address of global variable is overwrited, this function is called to calculate the new address for all its fields
-VOID BeforeWrite(VOID *addr) {
+VOID BeforeWrite(VOID *addr, ADDRINT rsp) {
     lock_acquire();
+    vt::rsp = rsp;
     var to_search;
     to_search.address = addr;
     auto it = var_set.find(&to_search);
@@ -30,8 +32,9 @@ VOID BeforeWrite(VOID *addr) {
 }
 
 // When the address of global variable is overwrited, this function is called to calculate the new address for all its fields
-VOID AfterWrite(VOID *addr) {
+VOID AfterWrite(VOID *addr, ADDRINT rsp) {
     lock_acquire();
+    vt::rsp = rsp;
     var to_search;
     to_search.address = addr;
     auto it = var_set.find(&to_search);
@@ -43,8 +46,9 @@ VOID AfterWrite(VOID *addr) {
     lock_release();
 }
 
-VOID BeforeFree(VOID* addr) {
+VOID BeforeFree(VOID* addr, ADDRINT rsp) {
     lock_acquire();
+    vt::rsp = rsp;
     if (addr != NULL)
         cout << "[CALL] [free(" << addr << ")]" << endl;
     var to_search;
@@ -70,6 +74,7 @@ VOID BeforeFree(VOID* addr) {
 
 VOID BeforeLeave(ADDRINT rbp, ADDRINT rsp) {
     lock_acquire();
+    vt::rsp = rsp;
     // cout << var_set.size() << endl;
     uint64_t start = rsp, end = rbp + 0x10;
     vector<var*> dirty;
@@ -119,6 +124,7 @@ VOID Image(IMG img, VOID* v) {
             IPOINT_BEFORE,
             (AFUNPTR)BeforeFree,
             IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+            IARG_REG_VALUE, REG_STACK_PTR,
             IARG_END
         );
 
@@ -133,6 +139,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)RecordRead,
                 IARG_MEMORYOP_EA, memOp,
+                IARG_REG_VALUE, REG_STACK_PTR,
                 IARG_END
             );
         }
@@ -140,6 +147,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)BeforeWrite,
                 IARG_MEMORYOP_EA, memOp,
+                IARG_REG_VALUE, REG_STACK_PTR,
                 IARG_END
             );
         }
@@ -147,6 +155,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
             INS_InsertPredicatedCall(
                 ins, IPOINT_AFTER, (AFUNPTR)AfterWrite,
                 IARG_MEMORYOP_EA, memOp,
+                IARG_REG_VALUE, REG_STACK_PTR,
                 IARG_END
             );
         }

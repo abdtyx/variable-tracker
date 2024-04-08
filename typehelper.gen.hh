@@ -68,6 +68,9 @@ bool invalid_ptr(void* addr) {
 }
 
 set<var*, compare_function<var*> > var_set;
+uint64_t base_address = 0;
+uint64_t stack_start = 0;
+uint64_t rsp = 0;   // rsp is typically lower than stack_start
 
 // spin-lock
 #include <stdatomic.h>
@@ -188,6 +191,7 @@ struct cvs<T*> {
 
         set<var*>::iterator i;
 
+        // FIXME: if (valid_ptr)
         var* T_var = var_construct<T>(value, v, "*(" + v->name + ")");
         i = var_set.find(T_var);
         if (i == var_set.end()) {
@@ -367,6 +371,7 @@ struct cvs<template_list<T>*> {
             v->children.push_back(*i);
         }
 
+        // FIXME: To trick T, cvs<T*> temp is needed
         // T a
         var* T_var = var_construct<T>(&(value->a), v, v->name + delimiter + "a");
         i = var_set.find(T_var);
@@ -411,9 +416,30 @@ struct _compare_function {
     }
 };
 
+void mmu_parser() {
+    int fd = open("/proc/self/maps", O_RDONLY);
+    if (fd < 0) exit(-1);
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    std::stringstream ss;
+    while (read(fd, buf, 500)) {
+        ss << buf;
+        memset(buf, 0, sizeof(buf));
+    }
+
+    string s;
+    while (getline(ss, s)) {
+        if (!base_address/* && strstr(s.c_str(), app_name.c_str())*/)
+            sscanf(s.c_str(), "%lx", &base_address);
+        if (!stack_start && strstr(s.c_str(), "[stack]"))
+            sscanf(s.c_str(), "%lx-%lx", &stack_start, &stack_start);
+    }
+    close(fd);
+    if (!(base_address && stack_start)) exit(-1);
+}
+
 void cvs_init(string app_name) {
     set<var*, _compare_function> _vars;
-    uint64_t base_address;
     // Initialize var set
     cout << "Initializing critical variable set\n";
 
@@ -424,26 +450,13 @@ void cvs_init(string app_name) {
     _vars.insert(var_construct<list*>(0, root, "l2"));
     delete root;
 
-    // get base address
-    int fd = open("/proc/self/maps", O_RDONLY);
-    if (fd < 0) exit(-1);
-    char buf[512];
-    memset(buf, 0, sizeof(buf));
-    read(fd, buf, 500);
-    if (strstr(buf, app_name.c_str())) {
-        if (sscanf(buf, "%lx", &base_address) <= 0) {
-            close(fd);
-            exit(-1);
-        }
-    } else {
-        close(fd);
-        exit(-1);
-    }
-    printf("Program base address: %lx\n", base_address);
-    close(fd);
+    // get base address and the start address of stack
+    mmu_parser();
+    printf("Program base address: 0x%lx\n", base_address);
+    printf("Program stack starting address: 0x%lx\n", stack_start);
 
     // find global variable by name
-    fd = open(app_name.c_str(), O_RDONLY);
+    int fd = open(app_name.c_str(), O_RDONLY);
     if (fd < 0) {
         cout << app_name << " not found\n";
         exit(-1);
