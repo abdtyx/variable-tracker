@@ -401,18 +401,20 @@ struct cvs<template_list<T>*> {
             v->children.push_back(*i);
         }
 
-        // FIXME: To trick T, cvs<T*> temp is needed
         // T a
-        var* T_var = var_construct<T>(&(value->a), v, v->name + delimiter + "a");
-        i = var_set.find(T_var);
-        if (i == var_set.end()) {
-            var_set.insert(T_var);
-            v->children.push_back(T_var);
-        } else {
-            delete T_var;
-            (*i)->father.insert(v);
-            v->children.push_back(*i);
-        }
+        // var* T_var = var_construct<T>(&(value->a), v, v->name + delimiter + "a");
+        // i = var_set.find(T_var);
+        // if (i == var_set.end()) {
+        //     var_set.insert(T_var);
+        //     v->children.push_back(T_var);
+        // } else {
+        //     delete T_var;
+        //     (*i)->father.insert(v);
+        //     v->children.push_back(*i);
+        // }
+        T* fake_ptr = &(value->a);
+        cvs<T*> temp_cvs;
+        temp_cvs.cvs_after_write(v, "->a.", &fake_ptr);
 
         // double* b
         var* double_var = var_construct<double*>(&(value->b), v, v->name + delimiter + "b");
