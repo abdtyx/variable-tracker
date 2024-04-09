@@ -140,17 +140,17 @@ struct log {
 template <typename T>
 struct log<T*> {
     static void log_read(var* v) {
-        T* value;
+        void* value;
         PIN_SafeCopy(&value, v->address, sizeof(value));
         cout << "[READ] " << boost::typeindex::type_id<T*>().pretty_name() << ' ' << v->name << ' ' << value << endl;
     }
     static void log_before_write(var* v) {
-        T* value;
+        void* value;
         PIN_SafeCopy(&value, v->address, sizeof(value));
         cout << "[BEFORE WRITE] " << boost::typeindex::type_id<T*>().pretty_name() << ' ' << v->name << ' ' << value << endl;
     }
     static void log_after_write(var* v) {
-        T* value;
+        void* value;
         PIN_SafeCopy(&value, v->address, sizeof(value));
         cout << "[AFTER WRITE] " << boost::typeindex::type_id<T*>().pretty_name() << ' ' << v->name << ' ' << value << endl;
     }
@@ -406,31 +406,6 @@ struct cvs<list*> {
 //             v->children.push_back(int_var);
 //         } else {
 //             delete int_var;
-//             (*i)->father.insert(v);
-//             v->children.push_back(*i);
-//         }
-//     }
-// };
-
-// template <>
-// struct cvs<char*> {
-//     void (*cvs_before_write)(var* v) = core_cvs_before_write;
-
-//     static void cvs_after_write(var* v, string delimiter, void* address) {
-//         char* value;
-//         PIN_SafeCopy(&value, address, sizeof(value));
-//         if (invalid_ptr(value))
-//             return;
-
-//         set<var*>::iterator i;
-
-//         var* char_var = var_construct<char>(value, v);
-//         i = var_set.find(char_var);
-//         if (i == var_set.end()) {
-//             var_set.insert(char_var);
-//             v->children.push_back(char_var);
-//         } else {
-//             delete char_var;
 //             (*i)->father.insert(v);
 //             v->children.push_back(*i);
 //         }
