@@ -36,6 +36,7 @@ struct var {
     string name;                              // 变量名
     void* address;                            // 变量地址
     bool invalid;                             // 暂时没用
+    size_t block_size;                        // 变量的内存块大小
     set<var*, compare_function<var*> > father;// who points at this var
     vector<var*> children;                    // children存储了这个指针指向的所有变量的地址。
     void (*log_read)(var* v);             // Read的log函数
@@ -184,6 +185,7 @@ var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
     v->name = name;
     v->address = (void*)addr;
     v->invalid = false;
+    v->block_size = sizeof(T);
     v->children.clear();
     v->father.insert(father);
     // v->type = type;
@@ -415,7 +417,10 @@ struct cvs<template_list<T>*> {
         // }
         T* fake_ptr = &(value->a);
         cvs<T*> temp_cvs;
+        size_t previous_block_size = v->block_size;
+        v->block_size = sizeof(T);
         temp_cvs.cvs_after_write(v, "->a.", &fake_ptr);
+        v->block_size = previous_block_size;
 
         // double* b
         var* double_var = var_construct<double*>(&(value->b), v, v->name + delimiter + "b");
