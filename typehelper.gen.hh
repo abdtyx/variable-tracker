@@ -1,10 +1,12 @@
 #include "pin.H"
+
 #include <iostream>
 #include <stdlib.h>
 #include <vector>
 #include <set>
 #include <map>
 #include <string>
+
 #include <elf.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -12,8 +14,6 @@
 #include <sys/mman.h>
 
 #include <boost/type_index.hpp>
-
-#include "dma_tbl.hh"
 
 #define DEFAULT_NAME "__DEFAULT_NAME__"
 #define DEFAULT_DELIMITER "->"
@@ -89,6 +89,7 @@ bool invalid_ptr(void* addr) {
 #include <sched.h>
 
 atomic_flag lock = ATOMIC_FLAG_INIT;
+atomic_flag malloc_lock = ATOMIC_FLAG_INIT;
 
 void lock_acquire() {
     while (atomic_flag_test_and_set(&lock))
@@ -97,6 +98,18 @@ void lock_acquire() {
 
 void lock_release() {
     atomic_flag_clear(&lock);
+}
+
+void malloc_lock_acquire() {
+    while (atomic_flag_test_and_set(&malloc_lock)) {
+        lock_release();
+        sched_yield();
+        lock_acquire();
+    }
+}
+
+void malloc_lock_release() {
+    atomic_flag_clear(&malloc_lock);
 }
 
 /////////////////////////////////////////////
@@ -168,6 +181,12 @@ void core_cvs_before_write(var* v) {
         }
     }
     v->children.clear();
+}
+
+#include "dma_tbl.hh"
+
+void core_cvs_after_write(var* v, string delimiter, void* address) {
+    // size_t sz = dma_tbl_find();
 }
 
 /////////////////////////////////////////////

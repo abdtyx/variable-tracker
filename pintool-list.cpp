@@ -3,7 +3,9 @@
 #include <iostream>
 
 using std::cout, std::endl, std::set;
-using vt::lock_acquire, vt::lock_release, vt::var_set, vt::var;
+using vt::lock_acquire, vt::lock_release;
+using vt::malloc_lock_acquire, vt::malloc_lock_release;
+using vt::var, vt::var_set;
 
 VOID RecordRead(VOID *addr, ADDRINT rsp) {
     lock_acquire();
@@ -49,6 +51,7 @@ VOID AfterWrite(VOID *addr, ADDRINT rsp) {
 VOID BeforeFree(VOID* addr, ADDRINT rsp) {
     lock_acquire();
     vt::rsp = rsp;
+    vt::dma_tbl_delete(addr);
     if (addr != NULL)
         cout << "[CALL] [free(" << addr << ")]" << endl;
     var to_search;
@@ -106,6 +109,29 @@ VOID BeforeLeave(ADDRINT rbp, ADDRINT rsp) {
     lock_release();
 }
 
+uint64_t temp_size;
+
+VOID BeforeMalloc(ADDRINT size, ADDRINT rsp) {
+    lock_acquire();
+    malloc_lock_acquire();
+    vt::rsp = rsp;
+
+    temp_size = size;
+
+    lock_release();
+}
+
+VOID AfterMalloc(VOID* ret, ADDRINT rsp) {
+    lock_acquire();
+    vt::rsp = rsp;
+
+    vt::dma_tbl_insert(ret, temp_size);
+    cout << "[CALL] [malloc(" << temp_size << ")]=" << ret << endl;
+
+    malloc_lock_release();
+    lock_release();
+}
+
 VOID Image(IMG img, VOID* v) {
     // search application name
     string app_name = IMG_Name(img);
@@ -129,6 +155,32 @@ VOID Image(IMG img, VOID* v) {
         );
 
         RTN_Close(freeRtn);
+    }
+
+    // Find the malloc() funcion.
+    RTN mallocRtn = RTN_FindByName(img, "malloc");
+    if (RTN_Valid(mallocRtn)) {
+        RTN_Open(mallocRtn);
+
+        RTN_InsertCall(
+            mallocRtn,
+            IPOINT_BEFORE,
+            (AFUNPTR)BeforeMalloc,
+            IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+            IARG_REG_VALUE, REG_STACK_PTR,
+            IARG_END
+        );
+
+        RTN_InsertCall(
+            mallocRtn,
+            IPOINT_AFTER,
+            (AFUNPTR)AfterMalloc,
+            IARG_FUNCRET_EXITPOINT_VALUE,
+            IARG_REG_VALUE, REG_STACK_PTR,
+            IARG_END
+        );
+
+        RTN_Close(mallocRtn);
     }
 }
 
