@@ -36,7 +36,6 @@ struct var {
     string name;                              // 变量名
     void* address;                            // 变量地址
     bool invalid;                             // 暂时没用
-    size_t block_size;                        // 变量的内存块大小
     set<var*, compare_function<var*> > father;// who points at this var
     vector<var*> children;                    // children存储了这个指针指向的所有变量的地址。
     void (*log_read)(var* v);             // Read的log函数
@@ -187,10 +186,6 @@ void core_cvs_before_write(var* v) {
     v->children.clear();
 }
 
-void core_cvs_after_write(var* v, string delimiter, void* address) {
-    // size_t sz = dma_tbl_find();
-}
-
 /////////////////////////////////////////
 ////////////////// cvs //////////////////
 /////////////////////////////////////////
@@ -201,12 +196,42 @@ struct cvs {
 };
 
 template <typename T>
+struct array_analyzer {
+    static void core_cvs_after_write(var* v, string delimiter, void* address){}
+};
+
+template <typename T>
+struct array_analyzer<T*> {
+    static void core_cvs_after_write(var* v, string delimiter, void* address) {
+        T* value;
+        PIN_SafeCopy(&value, address, sizeof(value));
+        if (invalid_ptr(value))
+            return;
+
+        size_t block_size = sizeof(T);
+        size_t size = dma_tbl_find(value);
+        // FIXME: if not found, the variable is on stack, this is a hack to support common variable on stack, but it does not support array on stack
+        if (!size)
+            size = block_size;
+
+        cvs<T*> s;
+        string vname = v->name;
+        for (size_t i = 0; i < size / block_size; i++) {
+            if (i != 0)
+                v->name = "(" + vname + "+" + std::to_string(i) + ")";
+            s.cvs_after_write(v, delimiter, &value);
+            value++;
+        }
+        v->name = vname;
+    }
+};
+
+template <typename T>
 var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
     var* v = new var;
     v->name = name;
     v->address = (void*)addr;
     v->invalid = false;
-    v->block_size = sizeof(T);
     v->children.clear();
     v->father.insert(father);
     // v->type = type;
@@ -216,7 +241,8 @@ var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
     v->log_after_write = l.log_after_write;
     cvs<T> s;
     v->cvs_before_write = s.cvs_before_write;
-    v->cvs_after_write = s.cvs_after_write;
+    array_analyzer<T> aa;
+    v->cvs_after_write = aa.core_cvs_after_write;
     return v;
 }
 
@@ -233,7 +259,11 @@ struct cvs<T*> {
 
         set<var*>::iterator i;
 
-        var* T_var = var_construct<T>(value, v, "*(" + v->name + ")");
+        var* T_var;
+        if (v->name.back() != ')')
+            T_var = var_construct<T>(value, v, "*(" + v->name + ")");
+        else
+            T_var = var_construct<T>(value, v, "*" + v->name);
         i = var_set.find(T_var);
         if (i == var_set.end()) {
             var_set.insert(T_var);
@@ -382,6 +412,31 @@ struct cvs<list*> {
 //     }
 // };
 
+// template <>
+// struct cvs<char*> {
+//     void (*cvs_before_write)(var* v) = core_cvs_before_write;
+
+//     static void cvs_after_write(var* v, string delimiter, void* address) {
+//         char* value;
+//         PIN_SafeCopy(&value, address, sizeof(value));
+//         if (invalid_ptr(value))
+//             return;
+
+//         set<var*>::iterator i;
+
+//         var* char_var = var_construct<char>(value, v);
+//         i = var_set.find(char_var);
+//         if (i == var_set.end()) {
+//             var_set.insert(char_var);
+//             v->children.push_back(char_var);
+//         } else {
+//             delete char_var;
+//             (*i)->father.insert(v);
+//             v->children.push_back(*i);
+//         }
+//     }
+// };
+
 template <typename T>
 class template_list {
 public:
@@ -438,10 +493,7 @@ struct cvs<template_list<T>*> {
         // }
         T* fake_ptr = &(value->a);
         cvs<T*> temp_cvs;
-        size_t previous_block_size = v->block_size;
-        v->block_size = sizeof(T);
         temp_cvs.cvs_after_write(v, "->a.", &fake_ptr);
-        v->block_size = previous_block_size;
 
         // double* b
         var* double_var = var_construct<double*>(&(value->b), v, v->name + delimiter + "b");
@@ -506,8 +558,13 @@ void cvs_init(string app_name) {
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
     var* root = new var;
     root->address = NULL;
+    // list test
     _vars.insert(var_construct<template_list<list>*>(0, root, "l"));
     _vars.insert(var_construct<template_list<list>*>(0, root, "l2"));
+    // array test
+    _vars.insert(var_construct<char*>(0, root, "str"));
+    // multi-pointer test
+    _vars.insert(var_construct<int**>(0, root, "a"));
     delete root;
 
     // get base address and the start address of stack
