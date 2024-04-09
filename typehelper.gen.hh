@@ -61,6 +61,10 @@ void print_var(var* v, string space = "") {
     space.pop_back();
     cout << space << "}" << endl;
 }
+/////////////////////////////////////////////////////////////////////////
+////////////////// Dynamic memory allocation table //////////////////////
+/////////////////////////////////////////////////////////////////////////
+#include "dma_tbl.hh"
 
 ////////////////////////////////////////////////////////
 ////////////////// ptr validation //////////////////////
@@ -75,7 +79,7 @@ bool valid_ptr(void* addr) {
     uint64_t value = (uint64_t)addr;
     // value >>= 40;
     // cout << "[value]: " << value << endl;
-    return ((value >> 40) == 0x55 || (value >= rsp && value < stack_start));
+    return (dma_tbl_find(addr) || (value >= rsp && value < stack_start));
 }
 
 bool invalid_ptr(void* addr) {
@@ -182,8 +186,6 @@ void core_cvs_before_write(var* v) {
     }
     v->children.clear();
 }
-
-#include "dma_tbl.hh"
 
 void core_cvs_after_write(var* v, string delimiter, void* address) {
     // size_t sz = dma_tbl_find();
