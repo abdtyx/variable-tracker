@@ -18,11 +18,13 @@ void dma_tbl_insert(void* addr, size_t sz) {
     dma_tbl.insert(upper_bound(dma_tbl.begin(), dma_tbl.end(), i), i);
 }
 
-bool dma_tbl_find(void* addr) {
-    if (addr == NULL) return false;
+uint64_t dma_tbl_find(void* addr) {
+    if (addr == NULL) return 0;
     uint64_t address = (uint64_t)addr;
     auto i = upper_bound(dma_tbl.begin(), dma_tbl.end(), make_pair(address, UINT64_MAX)) - 1;
-    return i->first <= address && address < i->first + i->second;
+    if (i->first <= address && address < i->first + i->second)
+        return i->second;
+    return 0;
 }
 
 void dma_tbl_delete(void* addr) {
