@@ -156,7 +156,7 @@ public:
     list* next;
 };
 
-void general_cvs_before_write(var* v) {
+void core_cvs_before_write(var* v) {
     for (auto child : v->children) {
         child->father.erase(v);
         if (child->father.size() == 0) {
@@ -202,7 +202,7 @@ var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
 // support multi-pointers
 template <typename T>
 struct cvs<T*> {
-    void (*cvs_before_write)(var* v) = general_cvs_before_write;
+    void (*cvs_before_write)(var* v) = core_cvs_before_write;
 
     static void cvs_after_write(var* v, string delimiter, void* address) {
         T* value;
@@ -240,7 +240,7 @@ struct cvs<T*> {
 
 template<>
 struct cvs<list*> {
-    void (*cvs_before_write)(var* v) = general_cvs_before_write;
+    void (*cvs_before_write)(var* v) = core_cvs_before_write;
 
     static void cvs_after_write(var* v, string delimiter, void* address) {
         // print_var(v);
@@ -313,7 +313,7 @@ struct cvs<list*> {
 
 // template<>
 // struct cvs<double*> {
-//     void (*cvs_before_write)(var* v) = general_cvs_before_write;
+//     void (*cvs_before_write)(var* v) = core_cvs_before_write;
 
 //     static void cvs_after_write(var* v, string delimiter, void* address) {
 //         double* value;
@@ -338,7 +338,7 @@ struct cvs<list*> {
 
 // template <>
 // struct cvs<int*> {
-//     void (*cvs_before_write)(var* v) = general_cvs_before_write;
+//     void (*cvs_before_write)(var* v) = core_cvs_before_write;
 
 //     static void cvs_after_write(var* v, string delimiter, void* address) {
 //         int* value;
@@ -371,7 +371,7 @@ public:
 
 template <typename T>
 struct cvs<template_list<T>*> {
-    void (*cvs_before_write)(var* v) = general_cvs_before_write;
+    void (*cvs_before_write)(var* v) = core_cvs_before_write;
 
     static void cvs_after_write(var* v, string delimiter, void* address) {
         template_list<T>* value;
