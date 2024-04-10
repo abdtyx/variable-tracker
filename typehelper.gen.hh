@@ -137,6 +137,25 @@ struct log {
     }
 };
 
+template <>
+struct log<char> {
+    static void log_read(var* v) {
+        char value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[READ] " << boost::typeindex::type_id<char>().pretty_name() << ' ' << v->name << ' ' << (int)value << endl;
+    }
+    static void log_before_write(var* v) {
+        char value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[BEFORE WRITE] " << boost::typeindex::type_id<char>().pretty_name() << ' ' << v->name << ' ' << (int)value << endl;
+    }
+    static void log_after_write(var* v) {
+        char value;
+        PIN_SafeCopy(&value, v->address, sizeof(value));
+        cout << "[AFTER WRITE] " << boost::typeindex::type_id<char>().pretty_name() << ' ' << v->name << ' ' << (int)value << endl;
+    }
+};
+
 template <typename T>
 struct log<T*> {
     static void log_read(var* v) {
@@ -172,7 +191,7 @@ public:
     list* next;
 };
 
-void core_cvs_before_write(var* v) {
+void cvs_before_write(var* v) {
     for (auto child : v->children) {
         child->father.erase(v);
         if (child->father.size() == 0) {
@@ -191,17 +210,18 @@ void core_cvs_before_write(var* v) {
 /////////////////////////////////////////
 template <typename T>
 struct cvs {
-    static void cvs_before_write(var* v){}
     static void cvs_after_write(var* v, string delimiter, void* address){}
 };
 
 template <typename T>
-struct array_analyzer {
+struct core_cvs {
+    static void core_cvs_before_write(var* v){}
     static void core_cvs_after_write(var* v, string delimiter, void* address){}
 };
 
 template <typename T>
-struct array_analyzer<T*> {
+struct core_cvs<T*> {
+    void (*core_cvs_before_write)(var* v) = cvs_before_write;
     static void core_cvs_after_write(var* v, string delimiter, void* address) {
         T* value;
         PIN_SafeCopy(&value, address, sizeof(value));
@@ -239,18 +259,15 @@ var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
     v->log_read = l.log_read;
     v->log_before_write = l.log_before_write;
     v->log_after_write = l.log_after_write;
-    cvs<T> s;
-    v->cvs_before_write = s.cvs_before_write;
-    array_analyzer<T> aa;
-    v->cvs_after_write = aa.core_cvs_after_write;
+    core_cvs<T> cc;
+    v->cvs_before_write = cc.core_cvs_before_write;
+    v->cvs_after_write = cc.core_cvs_after_write;
     return v;
 }
 
 // support multi-pointers
 template <typename T>
 struct cvs<T*> {
-    void (*cvs_before_write)(var* v) = core_cvs_before_write;
-
     static void cvs_after_write(var* v, string delimiter, void* address) {
         T* value;
         PIN_SafeCopy(&value, address, sizeof(value));
@@ -291,8 +308,6 @@ struct cvs<T*> {
 
 template<>
 struct cvs<list*> {
-    void (*cvs_before_write)(var* v) = core_cvs_before_write;
-
     static void cvs_after_write(var* v, string delimiter, void* address) {
         // print_var(v);
         list* value;
@@ -364,8 +379,6 @@ struct cvs<list*> {
 
 // template<>
 // struct cvs<double*> {
-//     void (*cvs_before_write)(var* v) = core_cvs_before_write;
-
 //     static void cvs_after_write(var* v, string delimiter, void* address) {
 //         double* value;
 //         PIN_SafeCopy(&value, address, sizeof(value));
@@ -389,8 +402,6 @@ struct cvs<list*> {
 
 // template <>
 // struct cvs<int*> {
-//     void (*cvs_before_write)(var* v) = core_cvs_before_write;
-
 //     static void cvs_after_write(var* v, string delimiter, void* address) {
 //         int* value;
 //         PIN_SafeCopy(&value, address, sizeof(value));
@@ -422,8 +433,6 @@ public:
 
 template <typename T>
 struct cvs<template_list<T>*> {
-    void (*cvs_before_write)(var* v) = core_cvs_before_write;
-
     static void cvs_after_write(var* v, string delimiter, void* address) {
         template_list<T>* value;
         PIN_SafeCopy(&value, address, sizeof(value));
