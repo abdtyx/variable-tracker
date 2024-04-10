@@ -1,5 +1,5 @@
 #include "pin.H"
-#include "typehelper.gen.hh"
+#include "vt.hh"
 #include <iostream>
 
 using std::cout, std::endl, std::set;
