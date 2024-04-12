@@ -77,52 +77,6 @@ struct cvs<list*> {
     }
 };
 
-// template<>
-// struct cvs<double*> {
-//     static void cvs_after_write(var* v, string delimiter, void* address) {
-//         double* value;
-//         PIN_SafeCopy(&value, address, sizeof(value));
-//         if (invalid_ptr(value))
-//             return;
-
-//         set<var*>::iterator i;
-
-//         var* double_var = var_construct<double>(value, v);
-//         i = var_set.find(double_var);
-//         if (i == var_set.end()) {
-//             var_set.insert(double_var);
-//             v->children.push_back(double_var);
-//         } else {
-//             delete double_var;
-//             (*i)->father.insert(v);
-//             v->children.push_back(*i);
-//         }
-//     }
-// };
-
-// template <>
-// struct cvs<int*> {
-//     static void cvs_after_write(var* v, string delimiter, void* address) {
-//         int* value;
-//         PIN_SafeCopy(&value, address, sizeof(value));
-//         if (invalid_ptr(value))
-//             return;
-
-//         set<var*>::iterator i;
-
-//         var* int_var = var_construct<int>(value, v);
-//         i = var_set.find(int_var);
-//         if (i == var_set.end()) {
-//             var_set.insert(int_var);
-//             v->children.push_back(int_var);
-//         } else {
-//             delete int_var;
-//             (*i)->father.insert(v);
-//             v->children.push_back(*i);
-//         }
-//     }
-// };
-
 template <typename T>
 struct cvs<template_list<T>*> {
     static void cvs_after_write(var* v, string delimiter, void* address) {
@@ -267,6 +221,127 @@ struct cvs<mock_vector<T>*> {
                     (*it)->father.insert(_var);
                 }
             }
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+    }
+};
+
+// Code to test a 24-byte object
+template <>
+struct cvs<obj*> {
+    static void cvs_after_write(var* v, string delimiter, void* address) {
+        obj* value;
+        PIN_SafeCopy(&value, address, sizeof(value));
+        if (invalid_ptr(value))
+            return;
+
+        set<var*>::iterator i;
+        var* _var;
+
+        // void*
+        _var = var_construct<void*>(value, v, v->name + delimiter + "var1");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+
+        // void*
+        _var = var_construct<void*>(value + 0x8, v, v->name + delimiter + "var2");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+
+        // void*
+        _var = var_construct<void*>(value + 0x10, v, v->name + delimiter + "var3");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+    }
+};
+
+template <>
+struct cvs<state_info*> {
+    static void cvs_after_write(var* v, string delimiter, void* address) {
+        state_info* value;
+        PIN_SafeCopy(&value, address, sizeof(value));
+        if (invalid_ptr(value))
+            return;
+
+        set<var*>::iterator i;
+        var* _var;
+
+        // void* pktmbuf_pool;
+        _var = var_construct<void*>(&(value->pktmbuf_pool), v, v->name + delimiter + "pktmbuf_pool");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+
+        // uint16_t nf_destination
+        _var = var_construct<uint16_t>(&(value->nf_destination), v, v->name + delimiter + "nf_destination");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+
+        // uint32_t* source_ips
+        _var = var_construct<uint32_t*>(&(value->source_ips), v, v->name + delimiter + "source_ips");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+            if (valid_ptr(value->source_ips)) {
+                var to_search;
+                to_search.address = value->source_ips;
+                auto it = var_set.find(&to_search);
+                if (it == var_set.end()) {
+                    _var->cvs_after_write(_var, DEFAULT_DELIMITER, _var->address);
+                } else {
+                    (*it)->father.insert(_var);
+                }
+            }
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+
+        // int print_flag
+        _var = var_construct<int>(&(value->print_flag), v, v->name + delimiter + "print_flag");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
         } else {
             delete _var;
             (*i)->father.insert(v);

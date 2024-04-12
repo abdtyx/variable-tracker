@@ -239,6 +239,12 @@ struct core_cvs {
     static void core_cvs_after_write(var* v, string delimiter, void* address){}
 };
 
+template <>
+struct core_cvs<void*> {
+    static void core_cvs_before_write(var* v){}
+    static void core_cvs_after_write(var* v, string delimiter, void* address){}
+};
+
 template <typename T>
 struct core_cvs<T*> {
     void (*core_cvs_before_write)(var* v) = cvs_before_write;
@@ -263,6 +269,8 @@ struct core_cvs<T*> {
             value++;
         }
         v->name = vname;
+        if (size / block_size > 1)
+            cout << "[ARRAY] " << vname << " has " << size / block_size << " elements" << endl;
     }
 };
 
@@ -645,6 +653,10 @@ void cvs_init(string app_name) {
     _vars.insert(var_construct<int>(0, root, "global_int"));
     // vector test
     _vars.insert(var_construct<mock_vector<int>*>(0, root, "v"));
+    // NF arp_response test
+    _vars.insert(var_construct<state_info*>(0, root, "_state_info"));
+    // vftable
+    _vars.insert(var_construct<obj*>(0, root, "vobj"));
     delete root;
 
     // get base address and the start address of stack
