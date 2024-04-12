@@ -1,5 +1,5 @@
-#ifndef __TYPEHELPER_HH
-#define __TYPEHELPER_HH
+#ifndef __TYPES_HH
+#define __TYPES_HH
 
 namespace vt {
 

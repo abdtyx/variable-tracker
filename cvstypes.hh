@@ -1,5 +1,5 @@
-#ifndef __TYPEHELPER_CVS_HH
-#define __TYPEHELPER_CVS_HH
+#ifndef __CVSTYPES_HH
+#define __CVSTYPES_HH
 
 #include "vt.hh"
 #include "types.hh"
