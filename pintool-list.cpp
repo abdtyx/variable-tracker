@@ -1,5 +1,5 @@
 #include "pin.H"
-#include "vt.hh"
+#include "cvstypes.hh"
 #include <iostream>
 
 using std::cout, std::endl, std::set;

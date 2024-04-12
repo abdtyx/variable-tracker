@@ -1,11 +1,14 @@
-// Dynamic memory allocation table
-
 #include <vector>
 #include <algorithm>
 #include <inttypes.h>
 
 using std::vector, std::pair, std::make_pair, std::upper_bound;
 
+namespace vt {
+
+/////////////////////////////////////////////////////////////////////
+////////////////// Dynamic memory allocation table //////////////////
+/////////////////////////////////////////////////////////////////////
 vector<pair<uint64_t, uint64_t>> dma_tbl;   // address, size
 
 void dma_tbl_init() {
@@ -33,4 +36,5 @@ void dma_tbl_delete(void* addr) {
     auto i = upper_bound(dma_tbl.begin(), dma_tbl.end(), make_pair(address, UINT64_MAX)) - 1;
     if (i->first == address)
         dma_tbl.erase(i);
+}
 }
