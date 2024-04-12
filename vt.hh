@@ -136,6 +136,13 @@ struct log {
 };
 
 template <>
+struct log<void> {
+    static void log_read(var* v) {}
+    static void log_before_write(var* v) {}
+    static void log_after_write(var* v) {}
+};
+
+template <>
 struct log<char> {
     static void log_read(var* v) {
         char value;
