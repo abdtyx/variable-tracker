@@ -52,8 +52,8 @@ VOID BeforeFree(VOID* addr, ADDRINT rsp) {
     lock_acquire();
     vt::rsp = rsp;
     vt::dma_tbl_delete(addr);
-    if (addr != NULL)
-        cout << "[CALL] [free(" << addr << ")]" << endl;
+    // if (addr != NULL)
+    //     cout << "[CALL] [free(" << addr << ")]" << endl;
     var to_search;
     to_search.address = addr;
     auto it = var_set.find(&to_search);
@@ -126,7 +126,7 @@ VOID AfterMalloc(VOID* ret, ADDRINT rsp) {
     vt::rsp = rsp;
 
     vt::dma_tbl_insert(ret, temp_size);
-    cout << "[CALL] [malloc(" << temp_size << ")]=" << ret << endl;
+    // cout << "[CALL] [malloc(" << temp_size << ")]=" << ret << endl;
 
     malloc_lock_release();
     lock_release();

@@ -350,6 +350,55 @@ struct cvs<state_info*> {
     }
 };
 
+template <>
+struct cvs<l2fwd_port_statistics*> {
+    static void cvs_after_write(var* v, string delimiter, void* address) {
+        l2fwd_port_statistics* value;
+        PIN_SafeCopy(&value, address, sizeof(value));
+        if (invalid_ptr(value))
+            return;
+
+        set<var*>::iterator i;
+        var* _var;
+
+        // uint64_t tx
+        _var = var_construct<uint64_t>(&(value->tx), v, v->name + delimiter + "tx");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+
+        // uint64_t rx
+        _var = var_construct<uint64_t>(&(value->rx), v, v->name + delimiter + "rx");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+
+        // uint64_t dropped
+        _var = var_construct<uint64_t>(&(value->dropped), v, v->name + delimiter + "dropped");
+        i = var_set.find(_var);
+        if (i == var_set.end()) {
+            var_set.insert(_var);
+            v->children.push_back(_var);
+        } else {
+            delete _var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+    }
+};
+
 }
 
 #endif

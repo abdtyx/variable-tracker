@@ -52,4 +52,12 @@ struct state_info {
     int print_flag;
 };
 
+// l2fwd_port_statistics
+/* Per-port statistics struct */
+struct l2fwd_port_statistics {
+	uint64_t tx;
+	uint64_t rx;
+	uint64_t dropped;
+} __attribute__((__aligned__(64)));
+
 #endif
