@@ -264,6 +264,45 @@ var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
 
 // support multi-pointers
 template <typename T>
+struct cvs<T**> {
+    static void cvs_after_write(var* v, string delimiter, void* address) {
+        T** value;
+        PIN_SafeCopy(&value, address, sizeof(value));
+        if (invalid_ptr(value))
+            return;
+
+        set<var*>::iterator i;
+
+        var* T_var;
+        if (v->name.back() != ')')
+            T_var = var_construct<T*>(value, v, "*(" + v->name + ")");
+        else
+            T_var = var_construct<T*>(value, v, "*" + v->name);
+        i = var_set.find(T_var);
+        if (i == var_set.end()) {
+            var_set.insert(T_var);
+            v->children.push_back(T_var);
+            void* ptr;
+            PIN_SafeCopy(&ptr, value, sizeof(ptr));
+            if (valid_ptr(ptr)) {
+                var to_search;
+                to_search.address = ptr;
+                auto it = var_set.find(&to_search);
+                if (it == var_set.end()) {
+                    T_var->cvs_after_write(T_var, DEFAULT_DELIMITER, T_var->address);
+                } else {
+                    (*it)->father.insert(T_var);
+                }
+            }
+        } else {
+            delete T_var;
+            (*i)->father.insert(v);
+            v->children.push_back(*i);
+        }
+    }
+};
+
+template <typename T>
 struct cvs<T*> {
     static void cvs_after_write(var* v, string delimiter, void* address) {
         T* value;
@@ -282,19 +321,6 @@ struct cvs<T*> {
         if (i == var_set.end()) {
             var_set.insert(T_var);
             v->children.push_back(T_var);
-            // FIXME: *value could be tricky to get right
-            void* ptr;
-            PIN_SafeCopy(&ptr, value, sizeof(ptr));
-            if (valid_ptr(ptr)) {
-                var to_search;
-                to_search.address = ptr;
-                auto it = var_set.find(&to_search);
-                if (it == var_set.end()) {
-                    T_var->cvs_after_write(T_var, DEFAULT_DELIMITER, T_var->address);
-                } else {
-                    (*it)->father.insert(T_var);
-                }
-            }
         } else {
             delete T_var;
             (*i)->father.insert(v);
