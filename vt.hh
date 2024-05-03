@@ -273,11 +273,19 @@ struct cvs<T**> {
 
         set<var*>::iterator i;
 
-        var* T_var;
-        if (v->name.back() != ')')
-            T_var = var_construct<T*>(value, v, "*(" + v->name + ")");
-        else
-            T_var = var_construct<T*>(value, v, "*" + v->name);
+        string name;
+        if (delimiter != DEFAULT_DELIMITER) {
+            name = v->name + delimiter;
+            if (name.back() == '.')
+                name.pop_back();
+        }
+        else {
+            if (v->name.back() != ')')
+                name = "*(" + v->name + ")";
+            else
+                name = "*" + v->name;
+        }
+        var* T_var = var_construct<T*>(value, v, name);
         i = var_set.find(T_var);
         if (i == var_set.end()) {
             var_set.insert(T_var);
@@ -312,11 +320,19 @@ struct cvs<T*> {
 
         set<var*>::iterator i;
 
-        var* T_var;
-        if (v->name.back() != ')')
-            T_var = var_construct<T>(value, v, "*(" + v->name + ")");
-        else
-            T_var = var_construct<T>(value, v, "*" + v->name);
+        string name;
+        if (delimiter != DEFAULT_DELIMITER) {
+            name = v->name + delimiter;
+            if (name.back() == '.')
+                name.pop_back();
+        }
+        else {
+            if (v->name.back() != ')')
+                name = "*(" + v->name + ")";
+            else
+                name = "*" + v->name;
+        }
+        var* T_var = var_construct<T>(value, v, name);
         i = var_set.find(T_var);
         if (i == var_set.end()) {
             var_set.insert(T_var);
@@ -371,7 +387,7 @@ void cvs_init(string app_name) {
     // list test
     // _vars.insert(var_construct<template_list<list>*>(0, root, "l"));
     // _vars.insert(var_construct<template_list<list>*>(0, root, "l2"));
-    _vars.insert(var_construct<template_list<int>*>(0, root, "l"));
+    _vars.insert(var_construct<template_list<list**>*>(0, root, "l"));
     _vars.insert(var_construct<template_list<int>*>(0, root, "l2"));
     // array test
     _vars.insert(var_construct<char*>(0, root, "str"));
