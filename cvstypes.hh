@@ -6,6 +6,8 @@
 
 namespace vt {
 
+#define CONSTRUCT_VAR(type, field) type* fake_name ## field = &(value->field); cvs<type*>::cvs_after_write(v, delimiter + #field ".", &fake_name ## field);
+
 template<>
 struct cvs<list*> {
     static void cvs_after_write(var* v, string delimiter, void* address) {
@@ -18,62 +20,13 @@ struct cvs<list*> {
         set<var*>::iterator i;
 
         // list* next
-        var* list_var = var_construct<list*>(&(value->next), v, v->name + delimiter + "next");
-        i = var_set.find(list_var);
-        if (i == var_set.end()) {
-            var_set.insert(list_var);
-            v->children.push_back(list_var);
-            // if valid ptr
-            if (valid_ptr(value->next)) {
-                var to_search;
-                to_search.address = value->next;
-                auto it = var_set.find(&to_search);
-                if (it == var_set.end()) {
-                    list_var->cvs_after_write(list_var, DEFAULT_DELIMITER, list_var->address);
-                } else {
-                    (*it)->father.insert(list_var);
-                }
-            }
-        } else {
-            delete list_var;
-            (*i)->father.insert(v);
-            v->children.push_back(*i);
-        }
+        CONSTRUCT_VAR(list*, next);
 
         // int a
-        var* int_var = var_construct<int>(&(value->a), v, v->name + delimiter + "a");
-        i = var_set.find(int_var);
-        if (i == var_set.end()) {
-            var_set.insert(int_var);
-            v->children.push_back(int_var);
-        } else {
-            delete int_var;
-            (*i)->father.insert(v);
-            v->children.push_back(*i);
-        }
+        CONSTRUCT_VAR(int, a);
 
         // double* b
-        var* double_var = var_construct<double*>(&(value->b), v, v->name + delimiter + "b");
-        i = var_set.find(double_var);
-        if (i == var_set.end()) {
-            var_set.insert(double_var);
-            v->children.push_back(double_var);
-            if (valid_ptr(value->b)) {
-                var to_search;
-                to_search.address = value->b;
-                auto it = var_set.find(&to_search);
-                if (it == var_set.end()) {
-                    double_var->cvs_after_write(double_var, DEFAULT_DELIMITER, double_var->address);
-                } else {
-                    (*it)->father.insert(double_var);
-                }
-            }
-        } else {
-            delete double_var;
-            (*i)->father.insert(v);
-            v->children.push_back(*i);
-        }
-        // print_var(v);
+        CONSTRUCT_VAR(double*, b);
     }
 };
 
@@ -88,65 +41,13 @@ struct cvs<template_list<T>*> {
         set<var*>::iterator i;
 
         // template_list* next
-        var* template_list_var = var_construct<template_list<T>*>(&(value->next), v, v->name + delimiter + "next");
-        i = var_set.find(template_list_var);
-        if (i == var_set.end()) {
-            var_set.insert(template_list_var);
-            v->children.push_back(template_list_var);
-            // if valid ptr
-            if (valid_ptr(value->next)) {
-                var to_search;
-                to_search.address = value->next;
-                auto it = var_set.find(&to_search);
-                if (it == var_set.end()) {
-                    template_list_var->cvs_after_write(template_list_var, DEFAULT_DELIMITER, template_list_var->address);
-                } else {
-                    (*it)->father.insert(template_list_var);
-                }
-            }
-        } else {
-            delete template_list_var;
-            (*i)->father.insert(v);
-            v->children.push_back(*i);
-        }
+        CONSTRUCT_VAR(template_list<T>*, next);
 
         // T a
-        // var* T_var = var_construct<T>(&(value->a), v, v->name + delimiter + "a");
-        // i = var_set.find(T_var);
-        // if (i == var_set.end()) {
-        //     var_set.insert(T_var);
-        //     v->children.push_back(T_var);
-        // } else {
-        //     delete T_var;
-        //     (*i)->father.insert(v);
-        //     v->children.push_back(*i);
-        // }
-        T* fake_ptr = &(value->a);
-        cvs<T*> temp_cvs;
-        temp_cvs.cvs_after_write(v, "->a.", &fake_ptr);
+        CONSTRUCT_VAR(T, a)
 
         // double* b
-        var* double_var = var_construct<double*>(&(value->b), v, v->name + delimiter + "b");
-        i = var_set.find(double_var);
-        if (i == var_set.end()) {
-            var_set.insert(double_var);
-            v->children.push_back(double_var);
-            if (valid_ptr(value->b)) {
-                var to_search;
-                to_search.address = value->b;
-                auto it = var_set.find(&to_search);
-                if (it == var_set.end()) {
-                    double_var->cvs_after_write(double_var, DEFAULT_DELIMITER, double_var->address);
-                } else {
-                    (*it)->father.insert(double_var);
-                }
-            }
-        } else {
-            delete double_var;
-            (*i)->father.insert(v);
-            v->children.push_back(*i);
-        }
-        // print_var(v);
+        CONSTRUCT_VAR(double*, b);
     }
 };
 
