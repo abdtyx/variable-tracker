@@ -154,6 +154,10 @@ VOID AfterMalloc(VOID* ret, ADDRINT rsp) {
     lock_release();
 }
 
+VOID BeforeCalloc(ADDRINT nmemb, ADDRINT size, ADDRINT rsp) {
+    BeforeMalloc(nmemb * size, rsp);
+}
+
 VOID Image(IMG img, VOID* v) {
     // search application name
     string app_name = IMG_Name(img);
@@ -204,6 +208,59 @@ VOID Image(IMG img, VOID* v) {
 
         RTN_Close(mallocRtn);
     }
+    
+    // Find the calloc() function.
+    RTN callocRtn = RTN_FindByName(img, "calloc");
+    if (RTN_Valid(callocRtn)) {
+        RTN_Open(callocRtn);
+
+        RTN_InsertCall(
+            callocRtn,
+            IPOINT_BEFORE,
+            (AFUNPTR)BeforeCalloc,
+            IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+            IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
+            IARG_REG_VALUE, REG_STACK_PTR,
+            IARG_END
+        );
+
+        RTN_InsertCall(
+            callocRtn,
+            IPOINT_AFTER,
+            (AFUNPTR)AfterMalloc,
+            IARG_FUNCRET_EXITPOINT_VALUE,
+            IARG_REG_VALUE, REG_STACK_PTR,
+            IARG_END
+        );
+
+        RTN_Close(callocRtn);
+    }
+
+    // Find the realloc() function
+    // RTN reallocRtn = RTN_FindByName(img, "realloc");
+    // if (RTN_Valid(reallocRtn)) {
+    //     RTN_Open(reallocRtn);
+
+    //     RTN_InsertCall(
+    //         reallocRtn,
+    //         IPOINT_BEFORE,
+    //         (AFUNPTR)BeforeRealloc,
+    //         IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+    //         IARG_REG_VALUE, REG_STACK_PTR,
+    //         IARG_END
+    //     );
+
+    //     RTN_InsertCall(
+    //         reallocRtn,
+    //         IPOINT_AFTER,
+    //         (AFUNPTR)AfterMalloc,
+    //         IARG_FUNCRET_EXITPOINT_VALUE,
+    //         IARG_REG_VALUE, REG_STACK_PTR,
+    //         IARG_END
+    //     );
+
+    //     RTN_Close(reallocRtn);
+    // }
 }
 
 VOID InsertInstruction(INS ins, VOID *v) {
