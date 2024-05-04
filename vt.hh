@@ -23,7 +23,7 @@
 #define DEFAULT_NAME "__DEFAULT_NAME__"
 #define DEFAULT_DELIMITER "->"
 
-using std::cout, std::endl, std::vector, std::set, std::map, std::string;
+using std::cout, std::cerr, std::endl, std::vector, std::set, std::map, std::string;
 
 namespace vt {
 
@@ -44,8 +44,12 @@ struct var {
     set<var*, compare_function<var*> > father;                          // who points at this variable
     vector<var*> children;                                              // children存储了这个指针指向的所有变量的地址
     void (*log_read)(var* v);                                           // 记录读到的值的回调函数
+#ifdef LOG_DETAILS
     void (*log_before_write)(var* v);                                   // 记录写之前变量值的回调函数
     void (*log_after_write)(var* v);                                    // 记录写之后变量值的回调函数
+#else
+    void (*log_write)(var* v);
+#endif
     void (*cvs_before_write)(var* v);                                   // 写之前更新CVS的回调函数
     void (*cvs_after_write)(var* v, string delimiter, void* address);   // 写之后更新CVS的回调函数
 
@@ -91,6 +95,7 @@ bool invalid_ptr(void* addr) {
 ///////////////////////////////////////////////
 atomic_flag lock = ATOMIC_FLAG_INIT;
 atomic_flag malloc_lock = ATOMIC_FLAG_INIT;
+atomic_flag state_lock = ATOMIC_FLAG_INIT;
 
 void lock_acquire() {
     while (atomic_flag_test_and_set(&lock))
@@ -113,9 +118,22 @@ void malloc_lock_release() {
     atomic_flag_clear(&malloc_lock);
 }
 
+void state_lock_acquire() {
+    while (atomic_flag_test_and_set(&state_lock)) {
+        lock_release();
+        sched_yield();
+        lock_acquire();
+    }
+}
+
+void state_lock_release() {
+    atomic_flag_clear(&state_lock);
+}
+
 /////////////////////////////////////////
 ////////////////// log //////////////////
 /////////////////////////////////////////
+#ifdef LOG_DETAILS
 template <typename T>
 struct log {
     static void log_read(var* v) {
@@ -179,6 +197,19 @@ struct log<T*> {
         cout << "[AFTER WRITE] " << boost::typeindex::type_id<T*>().pretty_name() << ' ' << v->name << ' ' << value << endl;
     }
 };
+#else
+template <typename T>
+struct log {
+    static void log_read(var* v) {
+        uint64_t packet_seq = 1;
+        cerr << "R " << packet_seq << ' ' << boost::typeindex::type_id<T>().pretty_name() << '_' << v->name << endl;
+    }
+    static void log_write(var* v) {
+        uint64_t packet_seq = 1;
+        cerr << "W " << packet_seq << ' ' << boost::typeindex::type_id<T>().pretty_name() << '_' << v->name << endl;
+    }
+};
+#endif
 
 void cvs_before_write(var* v) {
     for (auto child : v->children) {
@@ -254,8 +285,12 @@ var* var_construct(void* addr, var* father, string name = DEFAULT_NAME) {
     // v->type = type;
     log<T> l;
     v->log_read = l.log_read;
+#ifdef LOG_DETAILS
     v->log_before_write = l.log_before_write;
     v->log_after_write = l.log_after_write;
+#else
+    v->log_write = l.log_write;
+#endif
     core_cvs<T> cc;
     v->cvs_before_write = cc.core_cvs_before_write;
     v->cvs_after_write = cc.core_cvs_after_write;

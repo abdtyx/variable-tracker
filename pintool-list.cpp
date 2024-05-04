@@ -5,9 +5,17 @@
 using std::cout, std::endl, std::set;
 using vt::lock_acquire, vt::lock_release;
 using vt::malloc_lock_acquire, vt::malloc_lock_release;
+using vt::state_lock_acquire, vt::state_lock_release;
 using vt::var, vt::var_set;
 
-VOID RecordRead(VOID *addr, ADDRINT rsp) {
+VOID BeforeRead(VOID *addr, ADDRINT rsp) {
+    lock_acquire();
+    state_lock_acquire();
+    vt::rsp = rsp;
+    lock_release();
+}
+
+VOID AfterRead(VOID *addr, ADDRINT rsp) {
     lock_acquire();
     vt::rsp = rsp;
     var to_search;
@@ -16,18 +24,22 @@ VOID RecordRead(VOID *addr, ADDRINT rsp) {
     if (it != var_set.end()) {
         (*it)->log_read((*it));
     }
+    state_lock_release();
     lock_release();
 }
 
 // When the address of global variable is overwrited, this function is called to calculate the new address for all its fields
 VOID BeforeWrite(VOID *addr, ADDRINT rsp) {
     lock_acquire();
+    state_lock_acquire();
     vt::rsp = rsp;
     var to_search;
     to_search.address = addr;
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
+#ifdef LOG_DETAILS
         (*it)->log_before_write((*it));
+#endif
         (*it)->cvs_before_write(*it);
     }
     lock_release();
@@ -41,10 +53,14 @@ VOID AfterWrite(VOID *addr, ADDRINT rsp) {
     to_search.address = addr;
     auto it = var_set.find(&to_search);
     if (it != var_set.end()) {
+#ifdef LOG_DETAILS
         (*it)->log_after_write((*it));
+#else
+        (*it)->log_write((*it));
+#endif
         (*it)->cvs_after_write(*it, DEFAULT_DELIMITER, (*it)->address);
-        // print_var(*it);
     }
+    state_lock_release();
     lock_release();
 }
 
@@ -187,15 +203,23 @@ VOID Image(IMG img, VOID* v) {
 VOID InsertInstruction(INS ins, VOID *v) {
     UINT32 memOperands = INS_MemoryOperandCount(ins);
     for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
-        if (INS_MemoryOperandIsRead(ins, memOp)) {
+        if (INS_MemoryOperandIsRead(ins, memOp) && INS_IsValidForIpointAfter(ins)) {
             INS_InsertPredicatedCall(
-                ins, IPOINT_BEFORE, (AFUNPTR)RecordRead,
+                ins, IPOINT_BEFORE, (AFUNPTR)BeforeRead,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
                 IARG_END
             );
         }
-        if (INS_MemoryOperandIsWritten(ins, memOp)) {
+        if (INS_MemoryOperandIsRead(ins, memOp) && INS_IsValidForIpointAfter(ins)) {
+            INS_InsertPredicatedCall(
+                ins, IPOINT_AFTER, (AFUNPTR)AfterRead,
+                IARG_MEMORYOP_EA, memOp,
+                IARG_REG_VALUE, REG_STACK_PTR,
+                IARG_END
+            );
+        }
+        if (INS_MemoryOperandIsWritten(ins, memOp) && INS_IsValidForIpointAfter(ins)) {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)BeforeWrite,
                 IARG_MEMORYOP_EA, memOp,
