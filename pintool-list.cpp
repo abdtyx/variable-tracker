@@ -8,14 +8,15 @@ using vt::malloc_lock_acquire, vt::malloc_lock_release;
 using vt::state_lock_acquire, vt::state_lock_release;
 using vt::var, vt::var_set;
 
-VOID BeforeRead(VOID *addr, ADDRINT rsp) {
+VOID BeforeRead(VOID *addr, ADDRINT rsp, BOOL use_lock) {
     lock_acquire();
     state_lock_acquire();
     vt::rsp = rsp;
-    lock_release();
+    if (use_lock)
+        lock_release();
 }
 
-VOID AfterRead(VOID *addr, ADDRINT rsp) {
+VOID AfterRead(VOID *addr, ADDRINT rsp, BOOL use_lock) {
     lock_acquire();
     vt::rsp = rsp;
     var to_search;
@@ -24,14 +25,18 @@ VOID AfterRead(VOID *addr, ADDRINT rsp) {
     if (it != var_set.end()) {
         (*it)->log_read((*it));
     }
-    state_lock_release();
-    lock_release();
+    if (use_lock) {
+        state_lock_release();
+        lock_release();
+    }
 }
 
-// When the address of global variable is overwrited, this function is called to calculate the new address for all its fields
-VOID BeforeWrite(VOID *addr, ADDRINT rsp) {
-    lock_acquire();
-    state_lock_acquire();
+// When the address of global variable is overwritten, this function is called to remove the old address of its fields
+VOID BeforeWrite(VOID *addr, ADDRINT rsp, BOOL use_lock) {
+    if (use_lock) {
+        lock_acquire();
+        state_lock_acquire();
+    }
     vt::rsp = rsp;
     var to_search;
     to_search.address = addr;
@@ -45,9 +50,10 @@ VOID BeforeWrite(VOID *addr, ADDRINT rsp) {
     lock_release();
 }
 
-// When the address of global variable is overwrited, this function is called to calculate the new address for all its fields
-VOID AfterWrite(VOID *addr, ADDRINT rsp) {
-    lock_acquire();
+// When the address of global variable is overwritten, this function is called to calculate the new address for its fields
+VOID AfterWrite(VOID *addr, ADDRINT rsp, BOOL use_lock) {
+    if (use_lock)
+        lock_acquire();
     vt::rsp = rsp;
     var to_search;
     to_search.address = addr;
@@ -202,12 +208,25 @@ VOID Image(IMG img, VOID* v) {
 
 VOID InsertInstruction(INS ins, VOID *v) {
     UINT32 memOperands = INS_MemoryOperandCount(ins);
+    UINT64 callback_cnt = 0;
+    for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
+        if (INS_MemoryOperandIsRead(ins, memOp) && INS_IsValidForIpointAfter(ins))
+            callback_cnt++;
+        if (INS_MemoryOperandIsWritten(ins, memOp) && INS_IsValidForIpointAfter(ins))
+            callback_cnt++;
+    }
+    BOOL use_lock = true;
+    if (callback_cnt >= 2) {
+        // ins is like mov [eax], ebx
+        use_lock = false;
+    }
     for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
         if (INS_MemoryOperandIsRead(ins, memOp) && INS_IsValidForIpointAfter(ins)) {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)BeforeRead,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
+                IARG_BOOL, use_lock,
                 IARG_END
             );
         }
@@ -216,6 +235,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
                 ins, IPOINT_AFTER, (AFUNPTR)AfterRead,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
+                IARG_BOOL, use_lock,
                 IARG_END
             );
         }
@@ -224,6 +244,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
                 ins, IPOINT_BEFORE, (AFUNPTR)BeforeWrite,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
+                IARG_BOOL, use_lock,
                 IARG_END
             );
         }
@@ -232,6 +253,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
                 ins, IPOINT_AFTER, (AFUNPTR)AfterWrite,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
+                IARG_BOOL, use_lock,
                 IARG_END
             );
         }
