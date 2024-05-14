@@ -8,16 +8,23 @@ using vt::malloc_lock_acquire, vt::malloc_lock_release;
 using vt::state_lock_acquire, vt::state_lock_release;
 using vt::var, vt::var_set;
 
-VOID BeforeRead(VOID *addr, ADDRINT rsp, BOOL use_lock) {
-    lock_acquire();
-    state_lock_acquire();
+#define SINGLE (flags & 3)
+#define RFIRST (flags & 4)
+#define WFIRST (flags & 8)
+
+VOID BeforeRead(VOID *addr, ADDRINT rsp, INT flags) {
+    if (SINGLE || RFIRST) {
+        lock_acquire();
+        state_lock_acquire();
+    }
     vt::rsp = rsp;
-    if (use_lock)
+    if (SINGLE || WFIRST)
         lock_release();
 }
 
-VOID AfterRead(VOID *addr, ADDRINT rsp, BOOL use_lock) {
-    lock_acquire();
+VOID AfterRead(VOID *addr, ADDRINT rsp, INT flags) {
+    if (SINGLE || RFIRST)
+        lock_acquire();
     vt::rsp = rsp;
     var to_search;
     to_search.address = addr;
@@ -25,15 +32,15 @@ VOID AfterRead(VOID *addr, ADDRINT rsp, BOOL use_lock) {
     if (it != var_set.end()) {
         (*it)->log_read((*it));
     }
-    if (use_lock) {
+    if (SINGLE || WFIRST) {
         state_lock_release();
         lock_release();
     }
 }
 
 // When the address of global variable is overwritten, this function is called to remove the old address of its fields
-VOID BeforeWrite(VOID *addr, ADDRINT rsp, BOOL use_lock) {
-    if (use_lock) {
+VOID BeforeWrite(VOID *addr, ADDRINT rsp, INT flags) {
+    if (SINGLE || WFIRST) {
         lock_acquire();
         state_lock_acquire();
     }
@@ -47,12 +54,13 @@ VOID BeforeWrite(VOID *addr, ADDRINT rsp, BOOL use_lock) {
 #endif
         (*it)->cvs_before_write(*it);
     }
-    lock_release();
+    if (SINGLE || RFIRST)
+        lock_release();
 }
 
 // When the address of global variable is overwritten, this function is called to calculate the new address for its fields
-VOID AfterWrite(VOID *addr, ADDRINT rsp, BOOL use_lock) {
-    if (use_lock)
+VOID AfterWrite(VOID *addr, ADDRINT rsp, INT flags) {
+    if (SINGLE || WFIRST)
         lock_acquire();
     vt::rsp = rsp;
     var to_search;
@@ -66,8 +74,10 @@ VOID AfterWrite(VOID *addr, ADDRINT rsp, BOOL use_lock) {
 #endif
         (*it)->cvs_after_write(*it, DEFAULT_DELIMITER, (*it)->address);
     }
-    state_lock_release();
-    lock_release();
+    if (SINGLE || RFIRST) {
+        state_lock_release();
+        lock_release();
+    }
 }
 
 VOID BeforeFree(VOID* addr, ADDRINT rsp) {
@@ -209,32 +219,33 @@ VOID Image(IMG img, VOID* v) {
         RTN_Close(mallocRtn);
     }
     
+    // DISABLE CALLOC, or there will be deadlocks!!!!!
     // Find the calloc() function.
-    RTN callocRtn = RTN_FindByName(img, "calloc");
-    if (RTN_Valid(callocRtn)) {
-        RTN_Open(callocRtn);
+    // RTN callocRtn = RTN_FindByName(img, "calloc");
+    // if (RTN_Valid(callocRtn)) {
+    //     RTN_Open(callocRtn);
 
-        RTN_InsertCall(
-            callocRtn,
-            IPOINT_BEFORE,
-            (AFUNPTR)BeforeCalloc,
-            IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
-            IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
-            IARG_REG_VALUE, REG_STACK_PTR,
-            IARG_END
-        );
+    //     RTN_InsertCall(
+    //         callocRtn,
+    //         IPOINT_BEFORE,
+    //         (AFUNPTR)BeforeCalloc,
+    //         IARG_FUNCARG_ENTRYPOINT_VALUE, 0,
+    //         IARG_FUNCARG_ENTRYPOINT_VALUE, 1,
+    //         IARG_REG_VALUE, REG_STACK_PTR,
+    //         IARG_END
+    //     );
 
-        RTN_InsertCall(
-            callocRtn,
-            IPOINT_AFTER,
-            (AFUNPTR)AfterMalloc,
-            IARG_FUNCRET_EXITPOINT_VALUE,
-            IARG_REG_VALUE, REG_STACK_PTR,
-            IARG_END
-        );
+    //     RTN_InsertCall(
+    //         callocRtn,
+    //         IPOINT_AFTER,
+    //         (AFUNPTR)AfterMalloc,
+    //         IARG_FUNCRET_EXITPOINT_VALUE,
+    //         IARG_REG_VALUE, REG_STACK_PTR,
+    //         IARG_END
+    //     );
 
-        RTN_Close(callocRtn);
-    }
+    //     RTN_Close(callocRtn);
+    // }
 
     // Find the realloc() function
     // RTN reallocRtn = RTN_FindByName(img, "realloc");
@@ -265,25 +276,29 @@ VOID Image(IMG img, VOID* v) {
 
 VOID InsertInstruction(INS ins, VOID *v) {
     UINT32 memOperands = INS_MemoryOperandCount(ins);
-    UINT64 callback_cnt = 0;
+    INT flags = 0;
     for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
-        if (INS_MemoryOperandIsRead(ins, memOp) && INS_IsValidForIpointAfter(ins))
-            callback_cnt++;
-        if (INS_MemoryOperandIsWritten(ins, memOp) && INS_IsValidForIpointAfter(ins))
-            callback_cnt++;
+        if (INS_MemoryOperandIsRead(ins, memOp) && INS_IsValidForIpointAfter(ins)) {
+            if (flags)
+                flags <<= 2;
+            else
+                flags = 1;
+        }
+        if (INS_MemoryOperandIsWritten(ins, memOp) && INS_IsValidForIpointAfter(ins)) {
+            if (flags)
+                flags <<= 2;
+            else
+                flags = 2;
+        }
     }
-    BOOL use_lock = true;
-    if (callback_cnt >= 2) {
-        // ins is like mov [eax], ebx
-        use_lock = false;
-    }
+
     for (UINT32 memOp = 0; memOp < memOperands; memOp++) {
         if (INS_MemoryOperandIsRead(ins, memOp) && INS_IsValidForIpointAfter(ins)) {
             INS_InsertPredicatedCall(
                 ins, IPOINT_BEFORE, (AFUNPTR)BeforeRead,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
-                IARG_BOOL, use_lock,
+                IARG_BOOL, flags,
                 IARG_END
             );
         }
@@ -292,7 +307,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
                 ins, IPOINT_AFTER, (AFUNPTR)AfterRead,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
-                IARG_BOOL, use_lock,
+                IARG_BOOL, flags,
                 IARG_END
             );
         }
@@ -301,7 +316,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
                 ins, IPOINT_BEFORE, (AFUNPTR)BeforeWrite,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
-                IARG_BOOL, use_lock,
+                IARG_BOOL, flags,
                 IARG_END
             );
         }
@@ -310,7 +325,7 @@ VOID InsertInstruction(INS ins, VOID *v) {
                 ins, IPOINT_AFTER, (AFUNPTR)AfterWrite,
                 IARG_MEMORYOP_EA, memOp,
                 IARG_REG_VALUE, REG_STACK_PTR,
-                IARG_BOOL, use_lock,
+                IARG_BOOL, flags,
                 IARG_END
             );
         }

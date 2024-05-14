@@ -15,7 +15,12 @@
 #include <stdatomic.h>
 #include <sched.h>
 
+#include <cxxabi.h>
+#define LOG_DETAILS
+// #define NO_LOCK
+#ifdef LOG_DETAILS
 #include <boost/type_index.hpp>
+#endif
 
 #include "dma_tbl.hh"
 #include "types.hh"
@@ -90,6 +95,15 @@ bool invalid_ptr(void* addr) {
     return !valid_ptr(addr);
 }
 
+#ifdef NO_LOCK
+void lock_acquire() {}
+void lock_release() {}
+void malloc_lock_acquire() {}
+void malloc_lock_release() {}
+void state_lock_acquire() {}
+void state_lock_release() {}
+#else
+#ifndef QUEUE_LOCK
 ///////////////////////////////////////////////
 ////////////////// spin-lock //////////////////
 ///////////////////////////////////////////////
@@ -129,6 +143,54 @@ void state_lock_acquire() {
 void state_lock_release() {
     atomic_flag_clear(&state_lock);
 }
+
+#else
+//////////////////////////////////////////////////
+////////////////// pthread-lock //////////////////
+//////////////////////////////////////////////////
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+// pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
+// pthread_mutex_t malloc_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t malloc_cond = PTHREAD_COND_INITIALIZER;
+bool malloc_flag = true;
+// pthread_mutex_t state_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t state_cond = PTHREAD_COND_INITIALIZER;
+bool state_flag = true;
+
+void lock_acquire() {
+    pthread_mutex_lock(&lock);
+}
+
+void lock_release() {
+    pthread_mutex_unlock(&lock);
+}
+
+void malloc_lock_acquire() {
+    while (!malloc_flag) {
+        pthread_cond_wait(&malloc_cond, &lock);
+    }
+    malloc_flag = false;
+}
+
+void malloc_lock_release() {
+    malloc_flag = true;
+    pthread_cond_signal(&malloc_cond);
+}
+
+void state_lock_acquire() {
+    while (!state_flag) {
+        pthread_cond_wait(&state_cond, &lock);
+    }
+    state_flag = false;
+}
+
+void state_lock_release() {
+    state_flag = true;
+    pthread_cond_signal(&state_cond);
+}
+
+#endif
+#endif
 
 /////////////////////////////////////////
 ////////////////// log //////////////////
@@ -202,11 +264,17 @@ template <typename T>
 struct log {
     static void log_read(var* v) {
         uint64_t packet_seq = 1;
-        cerr << "R " << packet_seq << ' ' << boost::typeindex::type_id<T>().pretty_name() << '_' << v->name << endl;
+        char* dname = abi::__cxa_demangle(typeid(T).name(), NULL, NULL, NULL);
+        cerr << "R " << packet_seq << ' ' << dname << '_' << v->name << endl;
+        free(dname);
+        // cerr << "R " << packet_seq << ' ' << boost::typeindex::type_id<T>().pretty_name() << '_' << v->name << endl;
     }
     static void log_write(var* v) {
         uint64_t packet_seq = 1;
-        cerr << "W " << packet_seq << ' ' << boost::typeindex::type_id<T>().pretty_name() << '_' << v->name << endl;
+        char* dname = abi::__cxa_demangle(typeid(T).name(), NULL, NULL, NULL);
+        cerr << "W " << packet_seq << ' ' << dname << '_' << v->name << endl;
+        free(dname);
+        // cerr << "W " << packet_seq << ' ' << boost::typeindex::type_id<T>().pretty_name() << '_' << v->name << endl;
     }
 };
 #endif
@@ -419,27 +487,43 @@ void cvs_init(string app_name) {
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! We need a root father here rather than NULL
     var* root = new var;
     root->address = NULL;
+////////////////////////////////////////////////////////////
+/////////////////////////// test ///////////////////////////
+////////////////////////////////////////////////////////////
     // list test
     // _vars.insert(var_construct<template_list<list>*>(0, root, "l"));
     // _vars.insert(var_construct<template_list<list>*>(0, root, "l2"));
-    _vars.insert(var_construct<template_list<list**>*>(0, root, "l"));
-    _vars.insert(var_construct<template_list<int>*>(0, root, "l2"));
+    // _vars.insert(var_construct<template_list<list**>*>(0, root, "l"));
+    // _vars.insert(var_construct<template_list<int>*>(0, root, "l2"));
+
     // array test
-    _vars.insert(var_construct<char*>(0, root, "str"));
+    // _vars.insert(var_construct<char*>(0, root, "str"));
+
     // multi-pointer test
-    _vars.insert(var_construct<int**>(0, root, "a"));
+    // _vars.insert(var_construct<int**>(0, root, "a"));
+
     // multithreading test
-    _vars.insert(var_construct<int>(0, root, "global_int"));
+    // _vars.insert(var_construct<int>(0, root, "global_int"));
+
     // vector test
-    _vars.insert(var_construct<mock_vector<int>*>(0, root, "v"));
+    // _vars.insert(var_construct<mock_vector<int>*>(0, root, "v"));
+
     // NF arp_response test
-    _vars.insert(var_construct<state_info*>(0, root, "_state_info"));
+    // _vars.insert(var_construct<state_info*>(0, root, "_state_info"));
+
     // vftable
-    _vars.insert(var_construct<obj*>(0, root, "vobj"));
+    // _vars.insert(var_construct<obj*>(0, root, "vobj"));
+
     // l2fwd
-    _vars.insert(var_construct<uint16_t>(0, root, "nb_rxd"));
-    _vars.insert(var_construct<uint16_t>(0, root, "nb_txd"));
-    _vars.insert(var_construct<l2fwd_port_statistics*>(0, root, "port_statistics"));
+    // _vars.insert(var_construct<uint16_t>(0, root, "nb_rxd"));
+    // _vars.insert(var_construct<uint16_t>(0, root, "nb_txd"));
+    // _vars.insert(var_construct<l2fwd_port_statistics*>(0, root, "port_statistics"));
+
+////////////////////////////////////////////////////////////
+/////////////////////////// prod ///////////////////////////
+////////////////////////////////////////////////////////////
+    // original fastclick
+    // _vars.insert(var_construct<Vector<int>*>(0, root, "testv"));
     delete root;
 
     // get base address and the start address of stack
@@ -503,12 +587,14 @@ void cvs_init(string app_name) {
         to_search.name = vname;
         auto it = _vars.find(&to_search);
         if (it != _vars.end()) {
-            if ((*it)->name == "port_statistics") {
-                void* fake_ptr = (void*)(base_address + symtab[i].st_value);
-                (*it)->cvs_after_write(*it, "->", &fake_ptr);
-                cout << "Found variable " << vname << "[32] at address " << (void*)(base_address + symtab[i].st_value) << endl;
-                continue;
-            }
+            // A HACK EXAMPLE
+            // if ((*it)->name == "port_statistics") {
+            //     void* fake_ptr = (void*)(base_address + symtab[i].st_value);
+            //     (*it)->cvs_after_write(*it, "->", &fake_ptr);
+            //     cout << "Found variable " << vname << "[32] at address " << (void*)(base_address + symtab[i].st_value) << endl;
+            //     continue;
+            // }
+
             (*it)->address = (void*)(base_address + symtab[i].st_value);
             var_set.insert(*it);
             cout << "Found variable " << vname << " at address " << (*it)->address << endl;
